@@ -1,7 +1,6 @@
 #include <assert.h>
 #include <signal.h>
 #include <stdint.h>
-#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -13,35 +12,11 @@
 #include <netdb.h>
 #include <stdbool.h>
 
+#include "utils.c"
+#include "client.c"
+
 volatile int running;
 volatile int server_sockfd;
-
-// Simple wrapper for heap-allocated char*
-// with a length.
-typedef struct {
-    char *str;
-    size_t len;
-} String;
-
-String str_new(char *str)
-{
-    String s = {str, strnlen(str, INT_MAX)};
-    return s;
-}
-
-size_t str_len(String s)
-{
-    return s.len;
-}
-
-void str_drop(String s)
-{
-    free(s.str);
-}
-
-int tcp_socket_new() {
-    return socket(AF_INET, SOCK_STREAM, 0);
-}
 
 int tcp_socket_bind(int sockfd, uint16_t port) {
     assert(port >= 1024 && port <= 49151);
@@ -140,70 +115,6 @@ void shutdown_server() {
     running = 0;
     close(server_sockfd);
     shutdown(server_sockfd, SHUT_RDWR);
-}
-
-struct sockaddr_in get_ipv4_sockaddr(char *host, int port) {
-    struct hostent *server = gethostbyname(host);
-    if (server == NULL) {
-        fprintf(stderr, "ERROR, no such host\n");
-        exit(1);
-    }
-
-    struct sockaddr_in serv_addr;
-    memset(&serv_addr, 0, sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    memcpy(&serv_addr.sin_addr.s_addr, server->h_addr, server->h_length);
-    serv_addr.sin_port = htons(port);
-
-    return serv_addr;
-}
-
-String read_response(int sockfd) {
-    size_t buffer_size = 8192;
-    char *buffer = calloc(1, buffer_size);
-    int n = read(sockfd, buffer, buffer_size - 1);
-    if (n < 0) {
-        perror("ERROR reading from socket");
-        exit(1);
-    }
-    return str_new(buffer);
-}
-
-typedef struct {
-    char *host;
-    int port;
-} ClientArgs;
-
-void *run_client(void *args) {
-    ClientArgs *client_args = (ClientArgs *)args;
-
-    struct sockaddr_in serv_addr = get_ipv4_sockaddr(client_args->host, client_args->port);
-
-    int sockfd = tcp_socket_new();
-    if (sockfd < 0) {
-        perror("ERROR opening socket");
-        exit(1);
-    }
-
-    if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
-        perror("ERROR connecting");
-        exit(1);
-    }
-
-    String request = str_new("GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
-
-    printf("Sending request:\n%s\n", request.str);
-
-    if (write(sockfd, request.str, str_len(request)) < 0) {
-        perror("ERROR writing to socket");
-        exit(1);
-    }
-
-    String response = read_response(sockfd);
-
-    printf("Received response:\n%s\n", response.str);
-
-    pthread_exit(NULL);
 }
 
 void sigint_handler(int sig) {
