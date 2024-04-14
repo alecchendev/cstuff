@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <signal.h>
 #include <stdint.h>
 #include <limits.h>
 #include <stdio.h>
@@ -10,6 +11,10 @@
 #include <netinet/in.h>
 #include <pthread.h>
 #include <netdb.h>
+#include <stdbool.h>
+
+volatile int running;
+volatile int server_sockfd;
 
 // Simple wrapper for heap-allocated char*
 // with a length.
@@ -78,24 +83,28 @@ typedef struct {
 
 void *run_server(void *args) {
     ServerArgs *server_args = (ServerArgs *)args;
-    int sockfd = tcp_socket_new();
-    if (sockfd < 0) {
+    server_sockfd = tcp_socket_new();
+    if (server_sockfd < 0) {
         perror("ERROR opening socket");
         exit(1);
     }
 
     int port = server_args->port;
-    if (tcp_socket_bind(sockfd, port) < 0) {
+    if (tcp_socket_bind(server_sockfd, port) < 0) {
         perror("ERROR on binding");
         exit(1);
     }
 
     int backlog_size = 16;
-    listen(sockfd, backlog_size);
+    listen(server_sockfd, backlog_size);
 
-    while (1) {
-        int newsockfd = tcp_socket_accept(sockfd);
+    while (running) {
+        int newsockfd = tcp_socket_accept(server_sockfd);
         if (newsockfd < 0) {
+            if (running == 0) {
+                printf("Server shutting down...\n");
+                break;
+            }
             perror("ERROR on accept");
             exit(1);
         }
@@ -113,8 +122,14 @@ void *run_server(void *args) {
         close(newsockfd);
     }
 
-    close(sockfd);
+    close(server_sockfd);
     pthread_exit(NULL);
+}
+
+void shutdown_server() {
+    running = 0;
+    close(server_sockfd);
+    shutdown(server_sockfd, SHUT_RDWR);
 }
 
 struct sockaddr_in get_ipv4_sockaddr(char *host, int port) {
@@ -181,12 +196,22 @@ void *run_client(void *args) {
     pthread_exit(NULL);
 }
 
+void sigint_handler(int sig) {
+    printf("Received SIGINT, shutting down...\n");
+    shutdown_server();
+}
+
 int main()
 {
+    if (signal(SIGINT, sigint_handler) == SIG_ERR) {
+        perror("error setting signal handler");
+        exit(1);
+    }
 
     int port = 8080;
     pthread_t server_thread;
     ServerArgs server_args = {port};
+    running = 1;
     pthread_create(&server_thread, NULL, run_server, &server_args);
 
     pthread_t client_thread;
