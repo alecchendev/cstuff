@@ -89,6 +89,16 @@ void *run_server(void *args) {
         exit(1);
     }
 
+    // Allow the server to bind to the same port, overriding the TIME_WAIT
+    // that by default doesn't allow binding to the same port for a few
+    // minutes.
+    int yes = 1;
+    if (setsockopt(server_sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) < 0) {
+        perror("ERROR setsockopt SO_REUSEADDR");
+        close(server_sockfd);
+        exit(1);
+    }
+
     int port = server_args->port;
     if (tcp_socket_bind(server_sockfd, port) < 0) {
         perror("ERROR on binding");
