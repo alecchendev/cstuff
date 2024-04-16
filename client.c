@@ -59,7 +59,18 @@ void *run_client(void *args) {
         exit(1);
     }
 
-    String request = str_new("GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
+    const char *http_post_request =
+    "POST /data HTTP/1.1\r\n"
+    "Host: localhost:8080\r\n"
+    "Content-Type: application/json\r\n"
+    "Content-Length: 81\r\n"
+    "\r\n"
+    "{\n"
+    "  \"username\": \"testuser\",\n"
+    "  \"password\": \"testpassword\"\n"
+    "}\n";
+
+    String request = str_new((char *)http_post_request);
 
     printf("Sending request:\n%s\n", request.str);
 

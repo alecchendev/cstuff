@@ -25,7 +25,9 @@ size_t str_len(String s)
 
 void str_drop(String s)
 {
-    free(s.str);
+    if (s.str != NULL) {
+        free(s.str);
+    }
 }
 
 // Create a new TCP socket, returns the file descriptor.
