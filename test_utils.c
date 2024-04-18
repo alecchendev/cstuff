@@ -2,6 +2,6 @@
 #include "utils.c"
 
 typedef struct {
-    String name;
+    char *name;
     int passed;
 } TestResult;

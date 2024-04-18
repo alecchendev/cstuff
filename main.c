@@ -27,9 +27,9 @@ void run_tests() {
     for (size_t i = 0; i < n_tests; i++) {
         TestResult result = results[i];
         if (result.passed) {
-            printf("PASSED: %s\n", result.name.str);
+            printf("PASSED: %s\n", result.name);
         } else {
-            printf("FAILED: %s\n", result.name.str);
+            printf("FAILED: %s\n", result.name);
         }
     }
 }

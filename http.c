@@ -123,5 +123,5 @@ TestResult test_parse_http_request() {
     assert(strncmp(req.headers.headers[0].str, "Host: localhost:8080", 19) == 0);
     assert(strncmp(req.body.str, "", 1) == 0);
     request_drop(req);
-    return (TestResult){str_new("test_parse_http_request"), 1};
+    return (TestResult){"test_parse_http_request", 1};
 }
