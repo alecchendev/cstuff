@@ -1,8 +1,10 @@
 
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "utils.c"
+#include "test_utils.c"
 
 typedef struct {
     size_t len;
@@ -109,4 +111,17 @@ void request_drop(Request req) {
         str_drop(req.headers.headers[i]);
     }
     free(req.headers.headers);
+}
+
+TestResult test_parse_http_request() {
+    String request = str_new("GET / HTTP/1.1\r\nHost: localhost:8080\r\n\r\n");
+    Request req = parse_request(request);
+    assert(strncmp(req.method.str, "GET", 3) == 0);
+    assert(strncmp(req.path.str, "/", 1) == 0);
+    assert(strncmp(req.version.str, "HTTP/1.1", 8) == 0);
+    assert(req.headers.len == 1);
+    assert(strncmp(req.headers.headers[0].str, "Host: localhost:8080", 19) == 0);
+    assert(strncmp(req.body.str, "", 1) == 0);
+    request_drop(req);
+    return (TestResult){str_new("test_parse_http_request"), 1};
 }
