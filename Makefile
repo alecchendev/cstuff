@@ -5,3 +5,6 @@ build:
 
 run:
 	./main
+
+test: build
+	./main test

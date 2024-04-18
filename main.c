@@ -139,7 +139,6 @@ Request parse_request(String request) {
         token = strsep(&str, "\n ");
     }
     req.body = str_new(body);
-    printf("body_len: %zu\n", body_len);
 
     free(strfree);
     return req;
@@ -234,8 +233,46 @@ void sigint_handler(int sig) {
     shutdown_server();
 }
 
-int main()
+typedef struct {
+    String name;
+    int passed;
+} TestResult;
+
+TestResult test_parse_http_request() {
+    String request = str_new("GET / HTTP/1.1\r\nHost: localhost:8080\r\n\r\n");
+    Request req = parse_request(request);
+    assert(strncmp(req.method.str, "GET", 3) == 0);
+    assert(strncmp(req.path.str, "/", 1) == 0);
+    assert(strncmp(req.version.str, "HTTP/1.1", 8) == 0);
+    assert(req.headers.len == 1);
+    assert(strncmp(req.headers.headers[0].str, "Host: localhost:8080", 19) == 0);
+    assert(strncmp(req.body.str, "", 1) == 0);
+    request_drop(req);
+    return (TestResult){str_new("test_parse_http_request"), 1};
+}
+
+void run_tests() {
+    const size_t n_tests = 1;
+    TestResult results[n_tests] = {
+        test_parse_http_request(),
+    };
+    for (size_t i = 0; i < n_tests; i++) {
+        TestResult result = results[i];
+        if (result.passed) {
+            printf("PASSED: %s\n", result.name.str);
+        } else {
+            printf("FAILED: %s\n", result.name.str);
+        }
+    }
+}
+
+int main(int argc, char *argv[])
 {
+    if (argc > 1 && strncmp(argv[1], "test", 4) == 0) {
+        run_tests();
+        return 0;
+    }
+
     if (signal(SIGINT, sigint_handler) == SIG_ERR) {
         perror("error setting signal handler");
         exit(1);
