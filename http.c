@@ -18,8 +18,45 @@ void print_headers(Headers headers) {
     }
 }
 
+typedef enum {
+    GET,
+    POST,
+    PUT,
+    DELETE,
+    ERROR,
+} Method;
+
+Method str_to_method(const char *str) {
+    if (strncmp(str, "GET", 3) == 0) {
+        return GET;
+    } else if (strncmp(str, "POST", 4) == 0) {
+        return POST;
+    } else if (strncmp(str, "PUT", 3) == 0) {
+        return PUT;
+    } else if (strncmp(str, "DELETE", 6) == 0) {
+        return DELETE;
+    }
+    return ERROR;
+}
+
+// No heap allocation!
+String method_to_str(Method method) {
+    switch (method) {
+    case GET:
+        return str_new("GET");
+    case POST:
+        return str_new("POST");
+    case PUT:
+        return str_new("PUT");
+    case DELETE:
+        return str_new("DELETE");
+    default:
+        return str_new("ERROR");
+    }
+}
+
 typedef struct {
-    String method;
+    Method method;
     String path;
     String version;
     String body;
@@ -28,10 +65,11 @@ typedef struct {
 
 void print_request(Request req) {
     printf("Request:\n");
-    if (req.method.str == NULL) {
+    char *method = method_to_str(req.method).str;
+    if (method == NULL) {
         return;
     }
-    printf("Method: %s\n", req.method.str);
+    printf("Method: %s\n", method);
     if (req.path.str == NULL) {
         return;
     }
@@ -56,7 +94,12 @@ Request parse_request(String request) {
     if (token == NULL) {
         return req;
     }
-    req.method = str_new(strdup(token));
+    Method method = str_to_method(token);
+    if (method == ERROR) {
+        printf("Invalid method: %s\n", token);
+        return req;
+    }
+    req.method = method;
 
     token = strsep(&str, " ");
     if (token == NULL) {
@@ -103,7 +146,6 @@ Request parse_request(String request) {
 }
 
 void request_drop(Request req) {
-    str_drop(req.method);
     str_drop(req.path);
     str_drop(req.version);
     str_drop(req.body);
@@ -116,7 +158,7 @@ void request_drop(Request req) {
 TestResult test_parse_http_request() {
     String request = str_new("GET / HTTP/1.1\r\nHost: localhost:8080\r\n\r\n");
     Request req = parse_request(request);
-    assert(strncmp(req.method.str, "GET", 3) == 0);
+    assert(req.method == GET);
     assert(strncmp(req.path.str, "/", 1) == 0);
     assert(strncmp(req.version.str, "HTTP/1.1", 8) == 0);
     assert(req.headers.len == 1);

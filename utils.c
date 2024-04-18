@@ -5,8 +5,7 @@
 #include <unistd.h>
 #include <sys/socket.h>
 
-// Simple wrapper for heap-allocated char*
-// with a length.
+// Simple wrapper for char* with a length.
 typedef struct {
     char *str;
     size_t len;
