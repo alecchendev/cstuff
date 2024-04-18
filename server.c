@@ -61,40 +61,15 @@ String handle_request(Request request) {
 }
 
 typedef struct {
-    int port;
+    // The file descriptor for the socket the server is listening on.
+    int sockfd;
 } ServerArgs;
 
-void *run_server(void *args) {
+void *accept_and_handle_requests(void *args) {
     ServerArgs *server_args = (ServerArgs *)args;
-    server_sockfd = tcp_socket_new();
-    if (server_sockfd < 0) {
-        perror("ERROR opening socket");
-        exit(1);
-    }
-
-    // Allow the server to bind to the same port, overriding the TIME_WAIT
-    // that by default doesn't allow binding to the same port for a few
-    // minutes.
-    int yes = 1;
-    if (setsockopt(server_sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) < 0) {
-        perror("ERROR setsockopt SO_REUSEADDR");
-        close(server_sockfd);
-        exit(1);
-    }
-
-    int port = server_args->port;
-    free(server_args);
-    printf("Starting server on port %d\n", port);
-    if (tcp_socket_bind(server_sockfd, port) < 0) {
-        perror("ERROR on binding");
-        exit(1);
-    }
-
-    int backlog_size = 16;
-    listen(server_sockfd, backlog_size);
-
+    int sockfd = server_args->sockfd;
     while (running) {
-        int newsockfd = tcp_socket_accept(server_sockfd);
+        int newsockfd = tcp_socket_accept(sockfd);
         if (newsockfd < 0) {
             if (running == 0) {
                 printf("Server shutting down...\n");
@@ -132,12 +107,38 @@ pthread_t start_server(int port) {
         exit(1);
     }
 
-    ServerArgs *server_args = calloc(1, sizeof(ServerArgs));
-    server_args->port = port;
-
     running = 1;
+
+    server_sockfd = tcp_socket_new();
+    if (server_sockfd < 0) {
+        perror("ERROR opening socket");
+        exit(1);
+    }
+
+    // Allow the server to bind to the same port, overriding the TIME_WAIT
+    // that by default doesn't allow binding to the same port for a few
+    // minutes.
+    int yes = 1;
+    if (setsockopt(server_sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) < 0) {
+        perror("ERROR setsockopt SO_REUSEADDR");
+        close(server_sockfd);
+        exit(1);
+    }
+
+    printf("Starting server on port %d\n", port);
+    if (tcp_socket_bind(server_sockfd, port) < 0) {
+        perror("ERROR on binding");
+        exit(1);
+    }
+
+    int backlog_size = 16;
+    listen(server_sockfd, backlog_size);
+
+    ServerArgs *server_args = calloc(1, sizeof(ServerArgs));
+    server_args->sockfd = server_sockfd;
+
     pthread_t server_thread;
-    int res = pthread_create(&server_thread, NULL, run_server, server_args);
+    int res = pthread_create(&server_thread, NULL, accept_and_handle_requests, server_args);
     if (res != 0) {
         perror("ERROR creating server thread");
         exit(1);
