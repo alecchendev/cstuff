@@ -44,11 +44,7 @@ int main(int argc, char *argv[])
     int port = 8080;
     pthread_t server_thread = start_server(port);
 
-    pthread_t client_thread;
-    ClientArgs client_args = {"localhost", port};
-    pthread_create(&client_thread, NULL, run_client, &client_args);
-    pthread_join(client_thread, NULL);
-    printf("Client thread joined\n");
+    run_client("localhost", port);
 
     pthread_join(server_thread, NULL);
 

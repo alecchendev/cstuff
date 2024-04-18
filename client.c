@@ -43,10 +43,9 @@ typedef struct {
     int port;
 } ClientArgs;
 
-void *run_client(void *args) {
-    ClientArgs *client_args = (ClientArgs *)args;
+void run_client(char *host, int port) {
 
-    struct sockaddr_in serv_addr = get_ipv4_sockaddr(client_args->host, client_args->port);
+    struct sockaddr_in serv_addr = get_ipv4_sockaddr(host, port);
 
     int sockfd = tcp_socket_new();
     if (sockfd < 0) {
@@ -82,6 +81,4 @@ void *run_client(void *args) {
     String response = read_response(sockfd);
 
     printf("Received response:\n%s\n", response.str);
-
-    pthread_exit(NULL);
 }
