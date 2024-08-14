@@ -71,7 +71,7 @@ void run_client(char *host, int port) {
 
     String request = str_new((char *)http_post_request);
 
-    printf("Sending request:\n%s\n", request.str);
+    printf("Sending request\n");
 
     if (write(sockfd, request.str, str_len(request)) < 0) {
         perror("ERROR writing to socket");
@@ -80,5 +80,5 @@ void run_client(char *host, int port) {
 
     String response = read_response(sockfd);
 
-    printf("Received response:\n%s\n", response.str);
+    printf("Received response\n");
 }

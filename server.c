@@ -80,10 +80,7 @@ void *accept_and_handle_requests(void *args) {
         }
 
         String msg = read_request(newsockfd);
-        printf("Received message:\n%s\n", msg.str);
-
         Request req = parse_request(msg);
-        print_request(req);
 
         String response = handle_request(req);
         if (write(newsockfd, response.str, str_len(response)) < 0) {

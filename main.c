@@ -41,10 +41,13 @@ int main(int argc, char *argv[])
         return 0;
     }
 
+    char *host = "localhost";
     int port = 8080;
     pthread_t server_thread = start_server(port);
 
-    run_client("localhost", port);
+    run_client(host, port);
+    run_client(host, port);
+    run_client(host, port);
 
     pthread_join(server_thread, NULL);
 
