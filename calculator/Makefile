@@ -2,14 +2,14 @@ all: build run
 
 build: main.c
 	mkdir -p build
-	clang main.c -o build/main
+	clang -g main.c -o build/main
 
 run:
 	build/main
 
-test: build
-	build/main test
+build-test: test.c main.c
+	mkdir -p build
+	clang -g test.c -o build/test
 
-# test:
-# 	clang -o test test.c
-# 	./test
+test: build-test
+	build/test
