@@ -1,4 +1,5 @@
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -72,6 +73,116 @@ void arena_free(Arena *arena) {
 
 const unsigned int MAX_INPUT = 256;
 const char *prompt = ">>> ";
+
+enum TokenType {
+    NUMBER,
+    BINARY_OPERATOR,
+    WHITESPACE,
+    QUITTOKEN, // TODO: how to name QUIT without conflicts
+    END,
+    INVALID,
+};
+
+typedef union TokenData TokenData;
+union TokenData {
+    double number;
+    BinaryOp binary_operator;
+};
+
+typedef struct Token Token;
+struct Token {
+    enum TokenType type;
+    union TokenData data;
+};
+
+// TODO: turn this into something simpler at comptime
+bool char_in_set(char c, const unsigned char *set) {
+    bool char_set[256] = {0};
+    for (size_t i = 0; set[i] != '\0'; i++) {
+        char_set[set[i]] = true;
+    }
+    return char_set[c];
+}
+
+bool is_digit(char c) {
+    return c >= '0' && c <= '9';
+}
+
+double char_to_digit(char c) {
+    return c - '0';
+}
+
+Token next_token(char *input, size_t *pos, size_t length) {
+    const Token invalid_token = {INVALID};
+    const Token end_token = {END};
+    const unsigned char end[] = {'\0', '\n'};
+    if (*pos >= length || char_in_set(input[*pos], end)) {
+        if (*pos != length) return invalid_token;
+        return end_token;
+    }
+
+    if (input[*pos] == 'q' || input[*pos] == 'e') {
+        // TODO: handle no spaces after?
+        if (strncmp(input + *pos, "quit", 4) == 0 || strncmp(input + *pos, "exit", 4) == 0) {
+            Token quit_token = {QUITTOKEN};
+            *pos += 4;
+            return quit_token;
+        }
+    }
+
+    const Token whitespace_token = {WHITESPACE};
+    const unsigned char whitespace[] = {' ', '\t'};
+    if (char_in_set(input[*pos], whitespace)) {
+        while (char_in_set(input[*pos], whitespace)) {
+            (*pos)++;
+        }
+        return whitespace_token;
+    }
+
+    const unsigned char operators[] = {'+', '-', '*', '/'};
+    if (char_in_set(input[*pos], operators)) {
+        TokenData data;
+        switch (input[*pos]) {
+            case '+':
+                data.binary_operator = ADD;
+                break;
+            case '-':
+                data.binary_operator = SUBTRACT;
+                break;
+            case '*':
+                data.binary_operator = MULTIPLY;
+                break;
+            case '/':
+                data.binary_operator = DIVIDE;
+                break;
+        }
+        Token bin_token = {BINARY_OPERATOR, data};
+        (*pos)++;
+        return bin_token;
+    }
+
+    if (is_digit(input[*pos])) {
+        double number = 0;
+        while (is_digit(input[*pos])) {
+            number = number * 10 + char_to_digit(input[*pos]);
+            (*pos)++;
+        }
+        if (input[*pos] == '.') {
+            (*pos)++;
+            double decimal = 0.1;
+            while (input[*pos] >= '0' && input[*pos] <= '9') {
+                number += (input[*pos] - '0') * decimal;
+                decimal /= 10;
+                (*pos)++;
+            }
+        }
+        TokenData data = { .number = number };
+        Token num_token = {NUMBER, data};
+        return num_token;
+    }
+
+    return invalid_token;
+}
 
 Expression *parse(char *input, Arena *arena) {
     Expression *expr = arena_alloc(arena, sizeof(Expression));
