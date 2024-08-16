@@ -1,15 +1,15 @@
 all: build run
 
-build: main.c
+build: src/main.c
 	mkdir -p build
-	clang -g main.c -o build/main
+	clang -g src/main.c -o build/main
 
 run:
 	build/main
 
-build-test: test.c main.c
+build-test: src/test.c src/main.c
 	mkdir -p build
-	clang -g test.c -o build/test
+	clang -g src/test.c -o build/test
 
 test: build-test
 	build/test
