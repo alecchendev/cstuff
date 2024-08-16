@@ -1,6 +1,7 @@
 
-#include "lib.c"
-
+#include "parse.c"
+#include "tokenize.c"
+#include "arena.c"
 
 int main() {
     char input[MAX_INPUT];
@@ -16,21 +17,7 @@ int main() {
         TokenString tokens = tokenize(input, arena);
 
         for (size_t i = 0; i < tokens.length; i++) {
-            Token token = tokens.tokens[i];
-            if (token.type == END) {
-                printf("End of input\n");
-            } else if (token.type == INVALID) {
-                printf("Invalid token\n");
-            } else if (token.type == QUITTOKEN) {
-                printf("Quit token\n");
-                done = true;
-            } else if (token.type == NUMBER) {
-                printf("Number: %f\n", token.data.number);
-            } else if (token.type == BINARY_OPERATOR) {
-                printf("Operator: %d\n", token.data.binary_operator);
-            } else {
-                printf("Unknown token\n");
-            }
+            
         }
 
         /*Expression *expr = parse(input, arena);*/

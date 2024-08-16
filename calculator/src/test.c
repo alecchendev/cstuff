@@ -1,5 +1,7 @@
 
-#include "lib.c"
+#include "parse.c"
+#include "tokenize.c"
+#include "arena.c"
 
 typedef struct TokenCase TokenCase;
 struct TokenCase {
