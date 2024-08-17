@@ -47,7 +47,31 @@ bool tokens_equal(Token a, Token b) {
     }
 }
 
-void test_tokenize_case(TokenCase c) {
+bool fork_test_case(size_t case_num, void (*test)(void *), void *c_opaque,
+                    const char *pass_str, const char *fail_str) {
+    pid_t pid = fork();
+    assert(pid != -1);
+    if (pid == 0) {
+        test(c_opaque);
+        exit(0);
+    } else {
+        int status;
+        waitpid(pid, &status, 0);
+        if (WIFEXITED(status)) {
+            if (pass_str != NULL) printf(pass_str, case_num);
+            return true;
+        } else if (WIFSIGNALED(status)) {
+            if (fail_str != NULL) printf(fail_str, case_num);
+            return false;
+        } else {
+            printf("Child process exited abnormally\n");
+            return false;
+        }
+    }
+}
+
+void test_tokenize_case(void *c_opaque) {
+    TokenCase c = *(TokenCase *)c_opaque;
     Arena *arena = arena_create(MAX_MEMORY_SIZE);
     TokenString tokens = tokenize(c.input, arena);
     assert_eq(tokens.length, c.length);
@@ -57,7 +81,7 @@ void test_tokenize_case(TokenCase c) {
     arena_free(arena);
 }
 
-void test_tokenize() {
+void test_tokenize(void *_) {
     TokenCase cases[] = {
         {"", 1, {end_token}},
         {"1", 2, {token_new_num(1), end_token}},
@@ -75,59 +99,20 @@ void test_tokenize() {
     const size_t num_cases = sizeof(cases) / sizeof(TokenCase);
     bool all_passed = true;
     for (size_t i = 0; i < num_cases; i++) {
-        pid_t pid = fork();
-        if (pid == -1) {
-            printf("Fork failed for case %zu", i);
-            assert(false);
-        } else if (pid == 0) {
-            test_tokenize_case(cases[i]);
-            return;
-        } else {
-            int status;
-            waitpid(pid, &status, 0);
-            if (WIFSIGNALED(status)) {
-                printf("Case %zu failed\n", i);
-                all_passed = false;
-            } else if (!WIFEXITED(status)) {
-                printf("Child process exited abnormally: %d\n", status);
-            }
-        }
+        all_passed &= fork_test_case(i, test_tokenize_case, (void *)&cases[i],
+                                     NULL, "Case %zu failed\n");
     }
     assert(all_passed);
 }
 
 int main() {
-    void (*tests[])(void) = {
+    void (*tests[])(void *) = {
         test_tokenize,
     };
     const size_t n_tests = sizeof(tests) / sizeof(tests[0]);
     bool all_passed = true;
     for (size_t i = 0; i < n_tests; i++) {
-        // Spin off a separate process for each test
-        // so we can handle crashes and continue running
-        // the rest of the tests
-        pid_t pid = fork();
-        if (pid == -1) {
-            printf("Fork failed for test %zu", i);
-            exit(1);
-        } else if (pid == 0) {
-            // Child -> run test
-            tests[i]();
-            return 0;
-        } else {
-            // Parent -> check test
-            int status;
-            waitpid(pid, &status, 0);
-
-            if (WIFEXITED(status)) {
-                printf("Test %zu passed\n", i);
-            } else if (WIFSIGNALED(status)) {
-                printf("Test %zu failed\n", i);
-                all_passed = false;
-            } else {
-                printf("Child process exited abnormally\n");
-            }
-        }
+        all_passed &= fork_test_case(i, tests[i], NULL, "Test %zu passed\n", "Test %zu failed\n");
     }
     if (all_passed) {
         printf("All tests passed\n");
