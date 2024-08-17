@@ -3,6 +3,8 @@
 #include "tokenize.c"
 #include "arena.c"
 
+const size_t MAX_MEMORY_SIZE = MAX_INPUT * sizeof(Token) * MAX_INPUT * sizeof(Expression);
+
 int main() {
     char input[MAX_INPUT];
     FILE *input_fd = stdin;
@@ -15,21 +17,18 @@ int main() {
         input[strcspn(input, "\n")] = '\0';
         Arena *arena = arena_create(MAX_MEMORY_SIZE);
         TokenString tokens = tokenize(input, arena);
-
-        for (size_t i = 0; i < tokens.length; i++) {
-            
+        Expression *expr = parse(tokens, arena);
+        if (expr == NULL) {
+            printf("Invalid expression\n");
+        } else if (expr->type == EMPTY) {
+            // no op
+        } else if (expr->type == QUIT) {
+            // is this a case?
+            done = true;
+        } else {
+            double result = evaluate(*expr);
+            printf("%f\n", result);
         }
-
-        /*Expression *expr = parse(input, arena);*/
-        /*if (expr == NULL) {*/
-        /*    printf("Invalid expression\n");*/
-        /*    continue;*/
-        /*}*/
-        /*if (expr->type == QUIT) {*/
-        /*    break;*/
-        /*}*/
-        /*double result = evaluate(*expr);*/
-        /*printf("%f\n", result);*/
         arena_free(arena);
     }
     return 0;

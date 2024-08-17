@@ -3,6 +3,8 @@
 #include "tokenize.c"
 #include "arena.c"
 
+const size_t MAX_MEMORY_SIZE = MAX_INPUT * sizeof(Token);
+
 typedef struct TokenCase TokenCase;
 struct TokenCase {
     const char *input;

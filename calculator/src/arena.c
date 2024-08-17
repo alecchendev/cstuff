@@ -21,7 +21,7 @@ Arena *arena_create(size_t size) {
 
 void *arena_alloc(Arena *arena, size_t size) {
     if (arena->used + size > arena->size) {
-        printf("ERROR: Out of memory\n");
+        printf("ERROR: Out of memory: %lu + %lu > %lu\n", arena->used, size, arena->size);
         return NULL; // TODO
     }
     void *ptr = arena->memory + arena->used;

@@ -35,7 +35,6 @@ struct Token {
 };
 
 const unsigned int MAX_INPUT = 256;
-const size_t MAX_MEMORY_SIZE = MAX_INPUT * sizeof(Token);
 const char *prompt = ">>> ";
 
 // TODO: turn this into something simpler at comptime
