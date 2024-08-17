@@ -38,6 +38,13 @@ struct Expression {
     ExprData expr;
 };
 
+// Precedence - lower number means this should be evaluated first
+int precedence(BinaryOp op) {
+    if (op == MUL || op == DIV) return 1;
+    if (op == ADD || op == SUB) return 2;
+    return 0; // error case, shouldn't matter
+}
+
 Expression *parse(TokenString tokens, Arena *arena) {
     if (tokens.length == 0 || (tokens.length == 1 && tokens.tokens[0].type == END)) {
         Expression *expr = arena_alloc(arena, sizeof(Expression));
@@ -67,13 +74,17 @@ Expression *parse(TokenString tokens, Arena *arena) {
         return parse((TokenString) { .tokens = tokens.tokens, .length = 1 }, arena);
     }
 
+    // Find last case of highest precedence.
+    // When we evaluate, we evaluate the leaves first, so
+    // when we're creating the root here, we want the thing
+    // that will be evaluated last.
     BinaryOp op = NOOP;
     size_t op_index = 0;
     for (int i = 0; i < tokens.length; i++) {
-        if (tokens.tokens[i].type == BINARY_OPERATOR) {
+        int curr_precedence = precedence(tokens.tokens[i].data.binary_operator);
+        if (tokens.tokens[i].type == BINARY_OPERATOR && curr_precedence >= precedence(op)) {
             op = tokens.tokens[i].data.binary_operator;
             op_index = i;
-            break;
         }
     }
     if (op != NOOP && (op_index == 0 || op_index == tokens.length - 1)) {

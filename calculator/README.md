@@ -12,7 +12,7 @@ To do:
     - [ ] Make token parsing more elegant/generic
     - [ ] Handle more edge cases (quitX should be invalid)
 - [x] Recursively handle parsing any token sequence
-    - [ ] Respect order of operations
+    - [x] Respect order of operations
 - [x] Recursively handle evaluating any expression
 - [x] Write tests
     - [x] Basic tokenize tests
