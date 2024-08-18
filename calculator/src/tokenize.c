@@ -156,7 +156,12 @@ TokenString tokenize(const char *input, Arena *arena) {
     token_string.length = 0;
     bool done = false;
     size_t pos = 0;
-    size_t input_length = strnlen(input, MAX_INPUT);
+    size_t input_length = strnlen(input, MAX_INPUT + 1);
+    if (input_length > MAX_INPUT) {
+        token_string.tokens[0] = invalid_token;
+        token_string.length = 1;
+        return token_string;
+    }
     while (!done) {
         Token token = next_token(input, &pos, input_length);
         if (token.type == INVALID || token.type == END || token.type == QUITTOKEN) {

@@ -90,6 +90,8 @@ void test_tokenize_case(void *c_opaque) {
 }
 
 void test_tokenize(void *_) {
+    char max_len_input[MAX_INPUT + 1] = {0};
+    memset(max_len_input, 'x', MAX_INPUT + 1);
     TokenCase cases[] = {
         {"", 1, {end_token}},
         {"1", 2, {token_new_num(1), end_token}},
@@ -104,6 +106,7 @@ void test_tokenize(void *_) {
         {"quit", 1, {quit_token}},
         {"exit", 1, {quit_token}},
         {"quitX", 1, {invalid_token}}, // TODO: this should be invalid
+        {max_len_input, 1, {invalid_token}},
         // TODO: more comprehensive
     };
     const size_t num_cases = sizeof(cases) / sizeof(TokenCase);

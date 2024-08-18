@@ -10,7 +10,7 @@ This is also a miniature version of some broader compiler techniques, to learn C
 To do:
 - [x] Parse tokens properly
     - [ ] Make token parsing more elegant/generic
-    - [ ] Handle more edge cases (quitX should be invalid)
+    - [x] Handle more edge cases (quitX should be invalid)
 - [x] Recursively handle parsing any token sequence
     - [x] Respect order of operations
 - [x] Recursively handle evaluating any expression
