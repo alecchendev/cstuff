@@ -214,10 +214,8 @@ void repl(FILE *input_fd) {
 int main(int argc, char **argv) {
     if (argc == 1) {
         repl(stdin);
-        return 0;
     } else if (argc == 2) {
-        const char *input = argv[1];
-        execute_line(input);
+        execute_line(argv[1]);
     } else {
         printf("Usage: %s [input in quotes]\n", argv[0]);
     }
