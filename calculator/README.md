@@ -24,11 +24,11 @@ To do:
 - [ ] Handle other operations (pow/sqrt, parentheses, log)
 - [x] Tokenize scientific notation
 - [x] Allow running a single command instead of a repl
-- [ ] Handle arrow keys (history, moving left/right)
+- [x] Handle arrow keys (history, moving left/right)
     - [x] Refactor to process key input
     - [x] Hold state + redraw line for backspace
     - [x] Implement left right
-    - [ ] Implement history
+    - [x] Implement history
 - [ ] Handle other text editing (e.g. option/command + backspace)
 - [ ] Add debug logs configurable via a flag, that can write to a file
 - [ ] Address every TODO in the code

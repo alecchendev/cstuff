@@ -102,6 +102,22 @@ void redraw_line(const char input[MAX_INPUT], size_t input_len, size_t input_pos
     }
 }
 
+typedef struct Input Input;
+struct Input {
+    char data[MAX_INPUT];
+    size_t len;
+};
+
+typedef struct History History;
+struct History {
+    Input *history;
+    size_t len;
+    size_t pos;
+};
+
+#define MAX_HISTORY 64
+#define MAX_HISTORY_MEMORY (MAX_HISTORY * sizeof(Input))
+
 void repl(FILE *input_fd) {
     const int file_num = fileno(input_fd);
     struct termios termios_start;
@@ -123,10 +139,15 @@ void repl(FILE *input_fd) {
         exit(1); // TODO handle differently?
     }
 
+    Arena *history_arena = arena_create(MAX_HISTORY_MEMORY);
+    History history = { .history = NULL, .len = 0, .pos = 0 };
+    history.history = arena_alloc(history_arena, sizeof(Input) * MAX_HISTORY);
+
     bool done = false;
     while (!done) {
-        char input[MAX_INPUT] = {0};
-        size_t input_len = 0;
+        // Cache for latest input if we scroll through history
+        Input latest_input = { .data = {0}, .len = 0 };
+        Input input = { .data = {0}, .len = 0 };
         size_t input_pos = 0;
         printf("%s", prompt);
 
@@ -135,31 +156,59 @@ void repl(FILE *input_fd) {
             if (key.type == ENTER) {
                 printf("\n");
                 break;
-            } else if (key.type == PRINTABLE && input_len < MAX_INPUT) {
-                insert_slice(input, input_len, input_pos, &key.c, 1);
+            } else if (key.type == PRINTABLE && input.len < MAX_INPUT) {
+                insert_slice(input.data, input.len, input_pos, &key.c, 1);
                 input_pos++;
-                input_len++;
-                redraw_line(input, input_len, input_pos);
+                input.len++;
+                redraw_line(input.data, input.len, input_pos);
             } else if (key.type == BACKSPACE && input_pos > 0) {
                 input_pos--;
-                input_len--;
-                delete_slice(input, input_pos, input_pos + 1);
-                redraw_line(input, input_len, input_pos);
-            // TODO: handle arrow keys
-            } else if (key.type == UP) {
-                printf("UP");
-            } else if (key.type == DOWN) {
-                printf("DOWN");
+                input.len--;
+                delete_slice(input.data, input_pos, input_pos + 1);
+                redraw_line(input.data, input.len, input_pos);
+            } else if (key.type == UP && history.pos > 0) {
+                if (history.pos == history.len) {
+                    latest_input = input;
+                }
+                history.pos--;
+                input = history.history[history.pos];
+                input_pos = input.len;
+                redraw_line(input.data, input.len, input_pos);
+            } else if (key.type == DOWN && history.pos < history.len) {
+                history.pos++;
+                if (history.pos == history.len) {
+                    input = latest_input;
+                } else {
+                    input = history.history[history.pos];
+                }
+                input_pos = input.len;
+                redraw_line(input.data, input.len, input_pos);
             } else if (key.type == LEFT && input_pos > 0) {
                 input_pos--;
                 printf("\033[1D");
-            } else if (key.type == RIGHT && input_pos < input_len) {
+            } else if (key.type == RIGHT && input_pos < input.len) {
                 input_pos++;
                 printf("\033[1C");
             }
         }
-        done = execute_line(input);
+        if (input.len == 0) {
+            continue;
+        }
+        done = execute_line(input.data);
+
+        // MAX_HISTORY is small enough that we can just shift everything
+        if (history.len == MAX_HISTORY) {
+            for (size_t i = 0; i < MAX_HISTORY - 1; i++) {
+                history.history[i] = history.history[i + 1];
+            }
+            history.history[MAX_HISTORY - 1] = input;
+        } else {
+            history.history[history.len] = input;
+            history.len++;
+        }
+        history.pos = history.len;
     }
+    arena_free(history_arena);
 }
 
 int main(int argc, char **argv) {
