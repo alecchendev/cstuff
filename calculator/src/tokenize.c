@@ -34,7 +34,7 @@ struct Token {
     union TokenData data;
 };
 
-const unsigned int MAX_INPUT = 256;
+#define MAX_INPUT 256
 const char *prompt = ">>> ";
 
 // TODO: turn this into something simpler at comptime
@@ -52,6 +52,10 @@ bool is_digit(char c) {
 
 double char_to_digit(char c) {
     return c - '0';
+}
+
+bool is_letter(char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
 
 const Token invalid_token = {INVALID};
@@ -76,12 +80,18 @@ Token next_token(const char *input, size_t *pos, size_t length) {
         return end_token;
     }
 
-    if (input[*pos] == 'q' || input[*pos] == 'e') {
-        // TODO: handle no spaces after?
-        if (strncmp(input + *pos, "quit", 4) == 0 || strncmp(input + *pos, "exit", 4) == 0) {
-            *pos += 4;
+    if (is_letter(input[*pos])) {
+        char string_token[MAX_INPUT] = {0};
+        for (size_t i = 0; is_letter(input[*pos]); i++) {
+            string_token[i] = input[*pos];
+            (*pos)++;
+        }
+        if (strnlen(string_token, 5) == 4
+            && (strncmp(string_token, "quit", 4) == 0
+                || strncmp(string_token, "exit", 4) == 0)) {
             return quit_token;
         }
+        return invalid_token;
     }
 
     const unsigned char whitespace[] = {' ', '\t'};
@@ -122,8 +132,8 @@ Token next_token(const char *input, size_t *pos, size_t length) {
         if (input[*pos] == '.') {
             (*pos)++;
             double decimal = 0.1;
-            while (input[*pos] >= '0' && input[*pos] <= '9') {
-                number += (input[*pos] - '0') * decimal;
+            while (is_digit(input[*pos])) {
+                number += char_to_digit(input[*pos]) * decimal;
                 decimal /= 10;
                 (*pos)++;
             }

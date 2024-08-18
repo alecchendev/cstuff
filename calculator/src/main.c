@@ -3,7 +3,7 @@
 #include "tokenize.c"
 #include "arena.c"
 
-const size_t MAX_MEMORY_SIZE = MAX_INPUT * sizeof(Token) * MAX_INPUT * sizeof(Expression);
+const size_t MAX_MEMORY_SIZE = MAX_INPUT * sizeof(Token) + MAX_INPUT * sizeof(Expression);
 
 int main() {
     char input[MAX_INPUT];

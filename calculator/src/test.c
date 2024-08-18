@@ -86,14 +86,16 @@ void test_tokenize(void *_) {
         {"", 1, {end_token}},
         {"1", 2, {token_new_num(1), end_token}},
         {"1 + 2", 4, {token_new_num(1), token_new_bin(ADD), token_new_num(2), end_token}},
+        {"\t 1\t+     2  ", 4, {token_new_num(1), token_new_bin(ADD), token_new_num(2), end_token}},
         {"1 - 2 * 3 / 4", 8, {
             token_new_num(1), token_new_bin(SUB), token_new_num(2), token_new_bin(MUL),
             token_new_num(3), token_new_bin(DIV), token_new_num(4), end_token
         }},
+        {"45.874", 2, {token_new_num(45.874), end_token}},
         {"asdf", 1, {invalid_token}},
         {"quit", 1, {quit_token}},
         {"exit", 1, {quit_token}},
-        {"quitX", 1, {quit_token}},
+        {"quitX", 1, {invalid_token}}, // TODO: this should be invalid
         // TODO: more comprehensive
     };
     const size_t num_cases = sizeof(cases) / sizeof(TokenCase);
