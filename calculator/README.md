@@ -22,7 +22,7 @@ To do:
     - [x] Eval tests
     - [ ] Test memory abuse
 - [ ] Handle other operations (pow/sqrt, parentheses, log)
-- [ ] Tokenize scientific notation
+- [x] Tokenize scientific notation
 - [ ] Allow running a single command instead of a repl
 - [ ] Handle arrow keys (history, moving left/right)
 - [ ] Handle other text editing (e.g. option/command + backspace)

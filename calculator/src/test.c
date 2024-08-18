@@ -102,6 +102,10 @@ void test_tokenize(void *_) {
             token_new_num(3), token_new_bin(DIV), token_new_num(4), end_token
         }},
         {"45.874", 2, {token_new_num(45.874), end_token}},
+        {"2e3", 2, {token_new_num(2000), end_token}},
+        {"3.32e2", 2, {token_new_num(332), end_token}},
+        {"3.32E2", 2, {token_new_num(332), end_token}},
+        {"3.32e-2", 1, {invalid_token}}, // TODO: handle negatives generally + in scientific notation?
         {"asdf", 1, {invalid_token}},
         {"quit", 1, {quit_token}},
         {"exit", 1, {quit_token}},

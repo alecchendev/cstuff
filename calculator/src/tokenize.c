@@ -1,5 +1,6 @@
 #pragma once
 
+#include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -137,6 +138,19 @@ Token next_token(const char *input, size_t *pos, size_t length) {
                 decimal /= 10;
                 (*pos)++;
             }
+        }
+        if (input[*pos] == 'e' || input[*pos] == 'E') {
+            (*pos)++;
+            if (!is_digit(input[*pos])) {
+                return invalid_token;
+            }
+            double power = 0;
+            while (is_digit(input[*pos])) {
+                power += power * 10 + char_to_digit(input[*pos]);
+                (*pos)++;
+            }
+            // TODO: overflow check
+            number *= pow(10, power);
         }
         return token_new_num(number);
     }
