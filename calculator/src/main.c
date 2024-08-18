@@ -77,6 +77,31 @@ UserInput read_user_input(FILE *input_fd) {
     return input;
 }
 
+void insert_slice(char input[MAX_INPUT], size_t input_len, size_t input_pos, char slice[MAX_INPUT], size_t slice_len) {
+    if (input_pos > MAX_INPUT || input_len + slice_len > MAX_INPUT) return;
+    for (size_t i = input_len; i > input_pos; i--) {
+        input[i + slice_len] = input[i];
+    }
+    for (size_t i = 0; i < slice_len; i++) {
+        input[input_pos + i] = slice[i];
+    }
+}
+
+void delete_slice(char input[MAX_INPUT], size_t start, size_t end) {
+    if (end > MAX_INPUT + 1 || start >= end) return;
+    size_t len = end - start;
+    for (size_t i = start; i < MAX_INPUT - len; i++) {
+        input[i] = input[i + len];
+    }
+}
+
+void redraw_line(const char input[MAX_INPUT], size_t input_len, size_t input_pos) {
+    printf("\x1B[2K\r%s%s", prompt, input);
+    if (input_len > input_pos) {
+        printf("\x1B[%zuD", input_len - input_pos);
+    }
+}
+
 void repl(FILE *input_fd) {
     const int file_num = fileno(input_fd);
     struct termios termios_start;
@@ -101,33 +126,36 @@ void repl(FILE *input_fd) {
     bool done = false;
     while (!done) {
         char input[MAX_INPUT] = {0};
+        size_t input_len = 0;
+        size_t input_pos = 0;
         printf("%s", prompt);
 
-        size_t pos = 0;
         while (true) {
             UserInput key = read_user_input(input_fd);
             if (key.type == ENTER) {
                 printf("\n");
                 break;
-            } else if (key.type == PRINTABLE && pos < MAX_INPUT) {
-                printf("%c", key.c);
-                input[pos] = key.c;
-                pos++;
-            } else if (key.type == BACKSPACE && pos > 0) {
-                // TODO: handle backspace in the middle of input*/
-                // \033 = escape, [1D moves left, [K clears to end of line*/
-                printf("\033[1D\033[K");
-                pos--;
-                input[pos] = 0;
+            } else if (key.type == PRINTABLE && input_len < MAX_INPUT) {
+                insert_slice(input, input_len, input_pos, &key.c, 1);
+                input_pos++;
+                input_len++;
+                redraw_line(input, input_len, input_pos);
+            } else if (key.type == BACKSPACE && input_pos > 0) {
+                input_pos--;
+                input_len--;
+                delete_slice(input, input_pos, input_pos + 1);
+                redraw_line(input, input_len, input_pos);
             // TODO: handle arrow keys
             } else if (key.type == UP) {
                 printf("UP");
             } else if (key.type == DOWN) {
                 printf("DOWN");
-            } else if (key.type == LEFT) {
-                printf("LEFT");
-            } else if (key.type == RIGHT) {
-                printf("RIGHT");
+            } else if (key.type == LEFT && input_pos > 0) {
+                input_pos--;
+                printf("\033[1D");
+            } else if (key.type == RIGHT && input_pos < input_len) {
+                input_pos++;
+                printf("\033[1C");
             }
         }
         done = execute_line(input);
