@@ -16,10 +16,10 @@ To do:
 - [x] Recursively handle evaluating any expression
 - [x] Write tests
     - [x] Basic tokenize tests
-    - [ ] Handle panics in tests
+    - [x] Handle panics in tests
     - [ ] Display test result info better
     - [ ] Parse tests
-    - [ ] Eval tests
+    - [x] Eval tests
     - [ ] Test memory abuse
 - [ ] Handle other operations (pow/sqrt, parentheses, log)
 - [ ] Tokenize scientific notation

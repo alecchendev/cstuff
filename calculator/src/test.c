@@ -20,33 +20,6 @@ void __assert_fail(const char *condition, const char *function, const char *file
 // the expected and actual values
 #define assert_eq(a, b) assert((a) == (b))
 
-const size_t MAX_MEMORY_SIZE = MAX_INPUT * sizeof(Token);
-
-typedef struct TokenCase TokenCase;
-struct TokenCase {
-    const char *input;
-    const size_t length;
-    const Token expected[MAX_INPUT];
-};
-
-bool tokens_equal(Token a, Token b) {
-    if (a.type != b.type) {
-        printf("Expected type %d, got %d\n", b.type, a.type);
-        return false;
-    }
-    switch (a.type) {
-        case END:
-        case INVALID:
-        case QUITTOKEN:
-        case NUMBER:
-            return a.data.number == b.data.number;
-        case BINARY_OPERATOR:
-            return a.data.binary_operator == b.data.binary_operator;
-        default:
-            return false;
-    }
-}
-
 bool fork_test_case(size_t case_num, void (*test)(void *), void *c_opaque,
                     const char *pass_str, const char *fail_str) {
     pid_t pid = fork();
@@ -67,6 +40,41 @@ bool fork_test_case(size_t case_num, void (*test)(void *), void *c_opaque,
             printf("Child process exited abnormally\n");
             return false;
         }
+    }
+}
+
+const size_t MAX_MEMORY_SIZE = MAX_INPUT * sizeof(Token) + MAX_INPUT * sizeof(Expression);
+
+typedef struct TokenCase TokenCase;
+struct TokenCase {
+    const char *input;
+    const size_t length;
+    const Token expected[MAX_INPUT];
+};
+
+bool tokens_equal(Token a, Token b) {
+    if (a.type != b.type) {
+        printf("Expected type %d, got %d\n", b.type, a.type);
+        return false;
+    }
+    switch (a.type) {
+        case END:
+        case INVALID:
+        case QUITTOKEN:
+        case NUMBER:
+            if (a.data.number - b.data.number > 0.0000001) {
+                printf("Expected number %f, got %f\n", b.data.number, a.data.number);
+                return false;
+            }
+            return true;
+        case BINARY_OPERATOR:
+            if (a.data.binary_operator != b.data.binary_operator) {
+                printf("Expected operator %d, got %d\n", b.data.binary_operator, a.data.binary_operator);
+                return false;
+            }
+            return true;
+        default:
+            return false;
     }
 }
 
@@ -107,9 +115,50 @@ void test_tokenize(void *_) {
     assert(all_passed);
 }
 
+typedef struct {
+    const char *input;
+    const double expected;
+} EvaluateCase;
+
+void test_evaluate_case(void *c_opaque) {
+    EvaluateCase *c = (EvaluateCase *)c_opaque;
+    Arena *arena = arena_create(MAX_MEMORY_SIZE);
+    TokenString tokens = tokenize(c->input, arena);
+    Expression *expr = parse(tokens, arena);
+    assert(expr != NULL);
+    double result = evaluate(*expr);
+    assert_eq(result, c->expected);
+    arena_free(arena);
+}
+
+void test_evaluate(void *_) {
+    const EvaluateCase cases[] = {
+        // Basic ops
+        {"42", 42},
+        {"9 + 10", 19},
+        {"20 - 30", -10},
+        {"21 * 2", 42},
+        {"1 / 2", 0.5},
+        // Order of operations
+        {"1 + 2 * 3", 7},
+        {"2 / 4 + 1", 1.5},
+        // Everything
+        {" 3000  - 600 * 20 / 2.5 +\t20", -1780},
+        // TODO: overflow tests
+    };
+    const size_t num_cases = sizeof(cases) / sizeof(EvaluateCase);
+    bool all_passed = true;
+    for (size_t i = 0; i < num_cases; i++) {
+        all_passed &= fork_test_case(i, test_evaluate_case, (void *)&cases[i],
+                                     NULL, "Case %zu failed\n");
+    }
+    assert(all_passed);
+}
+
 int main() {
     void (*tests[])(void *) = {
         test_tokenize,
+        test_evaluate,
     };
     const size_t n_tests = sizeof(tests) / sizeof(tests[0]);
     bool all_passed = true;
