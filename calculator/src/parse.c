@@ -13,6 +13,7 @@ typedef struct BinaryExpr BinaryExpr;
 
 struct Constant {
     double value;
+    Unit unit;
 };
 
 struct BinaryExpr {
@@ -64,6 +65,7 @@ Expression *parse(TokenString tokens, Arena *arena) {
         Expression *expr = arena_alloc(arena, sizeof(Expression));
         expr->type = EXPR_CONSTANT;
         expr->expr.constant.value = tokens.tokens[0].number;
+        expr->expr.constant.unit = UNIT_NONE;
         /*printf("constant\n");*/
         return expr;
     }
@@ -71,9 +73,18 @@ Expression *parse(TokenString tokens, Arena *arena) {
         /*printf("Invalid expression token length 1\n");*/
         return NULL;
     }
-    if (tokens.length == 2 && tokens.tokens[1].type == TOK_END) {
+    if (tokens.length > 1 && tokens.tokens[tokens.length - 1].type == TOK_END) {
         /*printf("Parsing end token\n");*/
-        return parse((TokenString) { .tokens = tokens.tokens, .length = 1 }, arena);
+        return parse((TokenString) { .tokens = tokens.tokens, .length = tokens.length - 1 }, arena);
+    }
+    if (tokens.length == 2 && tokens.tokens[0].type == TOK_NUM
+        && tokens.tokens[1].type == TOK_UNIT) {
+        Expression *expr = arena_alloc(arena, sizeof(Expression));
+        expr->type = EXPR_CONSTANT;
+        expr->expr.constant.value = tokens.tokens[0].number;
+        expr->expr.constant.unit = tokens.tokens[1].unit;
+        /*printf("constant with unit\n");*/
+        return expr;
     }
 
     // Anything remaining should be a binary expression.

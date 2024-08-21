@@ -26,6 +26,7 @@ enum Unit {
     UNIT_OUNCE,
 
     UNIT_COUNT,
+    UNIT_NONE,
 };
 
 #define MAX_UNIT_STRING 3

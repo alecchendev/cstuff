@@ -97,9 +97,9 @@ void test_tokenize(void *_) {
         {"quitX", 1, {invalid_token}}, // TODO: this should be invalid
         {max_len_input, 1, {invalid_token}},
         // Units
-        {"3 cm + 5min", 6, {
+        {"3 cm + 5.5min", 6, {
             token_new_num(3), token_new_unit(UNIT_CENTIMETER), add_token,
-            token_new_num(5), token_new_unit(UNIT_MINUTE), end_token
+            token_new_num(5.5), token_new_unit(UNIT_MINUTE), end_token
         }}
         // TODO: more comprehensive
     };
@@ -141,6 +141,8 @@ void test_evaluate(void *_) {
         {"2 / 4 + 1", 1.5},
         // Everything
         {" 3000  - 600 * 20 / 2.5 +\t20", -1780},
+        // Units
+        {"2 cm * 3 + 1.5cm", 7.5},
         // TODO: overflow tests
     };
     const size_t num_cases = sizeof(cases) / sizeof(EvaluateCase);
