@@ -6,9 +6,53 @@
 #include <string.h>
 #include "arena.c"
 
+typedef enum Unit Unit;
+enum Unit {
+    // Distance
+    UNIT_CENTIMETER,
+    UNIT_METER,
+    UNIT_KILOMETER,
+    UNIT_INCH,
+    UNIT_FOOT,
+    UNIT_MILE,
+    // Time
+    UNIT_SECOND,
+    UNIT_MINUTE,
+    UNIT_HOUR,
+    // Mass
+    UNIT_GRAM,
+    UNIT_KILOGRAM,
+    UNIT_POUND,
+    UNIT_OUNCE,
+
+    UNIT_COUNT,
+};
+
+#define MAX_UNIT_STRING 3
+
+const char *unit_strings[] = {
+    // Distance
+    "cm",
+    "m",
+    "km",
+    "in",
+    "ft",
+    "mi",
+    // Time
+    "s",
+    "min",
+    "hr",
+    // Mass
+    "g",
+    "kg",
+    "lb",
+    "oz",
+};
+
 typedef enum TokenType TokenType;
 enum TokenType {
     TOK_NUM,
+    TOK_UNIT,
     TOK_ADD,
     TOK_SUB,
     TOK_MUL,
@@ -21,7 +65,8 @@ enum TokenType {
 
 typedef struct Token Token;
 struct Token {
-    enum TokenType type;
+    TokenType type;
+    Unit unit;
     double number;
 };
 
@@ -61,6 +106,10 @@ Token token_new_num(double num) {
     return (Token){TOK_NUM, .number = num };
 }
 
+Token token_new_unit(Unit unit) {
+    return (Token){TOK_UNIT, .unit = unit};
+}
+
 // TODO: make this more generic where I can simply define
 // basically a table of strings and their corresponding tokens
 Token next_token(const char *input, size_t *pos, size_t length) {
@@ -80,6 +129,14 @@ Token next_token(const char *input, size_t *pos, size_t length) {
             && (strncmp(string_token, "quit", 4) == 0
                 || strncmp(string_token, "exit", 4) == 0)) {
             return quit_token;
+        }
+        for (size_t unit = 0; unit < UNIT_COUNT; unit++) {
+            const char *unit_str = unit_strings[unit];
+            const size_t len = strnlen(unit_str, MAX_UNIT_STRING + 1);
+            const size_t str_len = strnlen(string_token, MAX_UNIT_STRING + 1);
+            if (str_len == len && strncmp(string_token, unit_str, len + 1) == 0) {
+                return (Token){TOK_UNIT, .unit = unit};
+            }
         }
         return invalid_token;
     }

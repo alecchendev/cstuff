@@ -96,6 +96,11 @@ void test_tokenize(void *_) {
         {"exit", 1, {quit_token}},
         {"quitX", 1, {invalid_token}}, // TODO: this should be invalid
         {max_len_input, 1, {invalid_token}},
+        // Units
+        {"3 cm + 5min", 6, {
+            token_new_num(3), token_new_unit(UNIT_CENTIMETER), add_token,
+            token_new_num(5), token_new_unit(UNIT_MINUTE), end_token
+        }}
         // TODO: more comprehensive
     };
     const size_t num_cases = sizeof(cases) / sizeof(TokenCase);
