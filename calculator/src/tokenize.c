@@ -6,33 +6,23 @@
 #include <string.h>
 #include "arena.c"
 
-typedef enum {
-    NOOP,
-    ADD,
-    SUB,
-    MUL,
-    DIV
-} BinaryOp;
-
+typedef enum TokenType TokenType;
 enum TokenType {
-    NUMBER,
-    BINARY_OPERATOR,
-    WHITESPACE,
-    QUITTOKEN, // TODO: how to name QUIT without conflicts
-    END,
-    INVALID,
-};
-
-typedef union TokenData TokenData;
-union TokenData {
-    double number;
-    BinaryOp binary_operator;
+    TOK_NUM,
+    TOK_ADD,
+    TOK_SUB,
+    TOK_MUL,
+    TOK_DIV,
+    TOK_WHITESPACE,
+    TOK_QUIT,
+    TOK_END,
+    TOK_INVALID,
 };
 
 typedef struct Token Token;
 struct Token {
     enum TokenType type;
-    union TokenData data;
+    double number;
 };
 
 #define MAX_INPUT 256
@@ -59,17 +49,17 @@ bool is_letter(char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
 
-const Token invalid_token = {INVALID};
-const Token end_token = {END};
-const Token quit_token = {QUITTOKEN};
-const Token whitespace_token = {WHITESPACE};
-
-Token token_new_bin(BinaryOp op) {
-    return (Token){BINARY_OPERATOR, .data = { .binary_operator = op }};
-}
+const Token invalid_token = {TOK_INVALID};
+const Token end_token = {TOK_END};
+const Token quit_token = {TOK_QUIT};
+const Token whitespace_token = {TOK_WHITESPACE};
+const Token add_token = {TOK_ADD};
+const Token sub_token = {TOK_SUB};
+const Token mul_token = {TOK_MUL};
+const Token div_token = {TOK_DIV};
 
 Token token_new_num(double num) {
-    return (Token){NUMBER, .data = { .number = num }};
+    return (Token){TOK_NUM, .number = num };
 }
 
 // TODO: make this more generic where I can simply define
@@ -105,23 +95,18 @@ Token next_token(const char *input, size_t *pos, size_t length) {
 
     const unsigned char operators[] = {'+', '-', '*', '/'};
     if (char_in_set(input[*pos], operators)) {
-        BinaryOp op;
-        switch (input[*pos]) {
-            case '+':
-                op = ADD;
-                break;
-            case '-':
-                op = SUB;
-                break;
-            case '*':
-                op = MUL;
-                break;
-            case '/':
-                op = DIV;
-                break;
+        Token token;
+        if (input[*pos] == '+') {
+            token = add_token;
+        } else if (input[*pos] == '-') {
+            token = sub_token;
+        } else if (input[*pos] == '*') {
+            token = mul_token;
+        } else if (input[*pos] == '/') {
+            token = div_token;
         }
         (*pos)++;
-        return token_new_bin(op);
+        return token;
     }
 
     if (is_digit(input[*pos])) {
@@ -178,9 +163,9 @@ TokenString tokenize(const char *input, Arena *arena) {
     }
     while (!done) {
         Token token = next_token(input, &pos, input_length);
-        if (token.type == INVALID || token.type == END || token.type == QUITTOKEN) {
+        if (token.type == TOK_INVALID || token.type == TOK_END || token.type == TOK_QUIT) {
             done = true;
-        } else if (token.type == WHITESPACE) {
+        } else if (token.type == TOK_WHITESPACE) {
             continue;
         }
         token_string.tokens[token_string.length] = token;
@@ -191,20 +176,29 @@ TokenString tokenize(const char *input, Arena *arena) {
 
 void token_display(Token token) {
     switch (token.type) {
-        case END:
+        case TOK_END:
             printf("End of input\n");
             break;
-        case INVALID:
+        case TOK_INVALID:
             printf("Invalid token\n");
             break;
-        case QUITTOKEN:
+        case TOK_QUIT:
             printf("Quit token\n");
             break;
-        case NUMBER:
-            printf("Number: %f\n", token.data.number);
+        case TOK_NUM:
+            printf("Number: %f\n", token.number);
             break;
-        case BINARY_OPERATOR:
-            printf("Operator: %d\n", token.data.binary_operator);
+        case TOK_ADD:
+            printf("Addition token\n");
+            break;
+        case TOK_SUB:
+            printf("Subtraction token\n");
+            break;
+        case TOK_MUL:
+            printf("Multiplication token\n");
+            break;
+        case TOK_DIV:
+            printf("Division token\n");
             break;
         default:
             printf("Unknown token\n");

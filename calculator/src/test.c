@@ -57,25 +57,11 @@ bool tokens_equal(Token a, Token b) {
         printf("Expected type %d, got %d\n", b.type, a.type);
         return false;
     }
-    switch (a.type) {
-        case END:
-        case INVALID:
-        case QUITTOKEN:
-        case NUMBER:
-            if (a.data.number - b.data.number > 0.0000001) {
-                printf("Expected number %f, got %f\n", b.data.number, a.data.number);
-                return false;
-            }
-            return true;
-        case BINARY_OPERATOR:
-            if (a.data.binary_operator != b.data.binary_operator) {
-                printf("Expected operator %d, got %d\n", b.data.binary_operator, a.data.binary_operator);
-                return false;
-            }
-            return true;
-        default:
-            return false;
+    if (a.type == TOK_NUM && a.number - b.number > 0.0000001) {
+        printf("Expected number %f, got %f\n", b.number, a.number);
+        return false;
     }
+    return true;
 }
 
 void test_tokenize_case(void *c_opaque) {
@@ -95,11 +81,11 @@ void test_tokenize(void *_) {
     TokenCase cases[] = {
         {"", 1, {end_token}},
         {"1", 2, {token_new_num(1), end_token}},
-        {"1 + 2", 4, {token_new_num(1), token_new_bin(ADD), token_new_num(2), end_token}},
-        {"\t 1\t+     2  ", 4, {token_new_num(1), token_new_bin(ADD), token_new_num(2), end_token}},
+        {"1 + 2", 4, {token_new_num(1), add_token, token_new_num(2), end_token}},
+        {"\t 1\t+     2  ", 4, {token_new_num(1), add_token, token_new_num(2), end_token}},
         {"1 - 2 * 3 / 4", 8, {
-            token_new_num(1), token_new_bin(SUB), token_new_num(2), token_new_bin(MUL),
-            token_new_num(3), token_new_bin(DIV), token_new_num(4), end_token
+            token_new_num(1), sub_token, token_new_num(2), mul_token,
+            token_new_num(3), div_token, token_new_num(4), end_token
         }},
         {"45.874", 2, {token_new_num(45.874), end_token}},
         {"2e3", 2, {token_new_num(2000), end_token}},
