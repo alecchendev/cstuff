@@ -27,6 +27,7 @@ enum Unit {
 
     UNIT_COUNT,
     UNIT_NONE,
+    UNIT_UNKNOWN,
 };
 
 #define MAX_UNIT_STRING 3
@@ -48,6 +49,10 @@ const char *unit_strings[] = {
     "kg",
     "lb",
     "oz",
+
+    "",
+    "none",
+    "unknown",
 };
 
 typedef enum TokenType TokenType;

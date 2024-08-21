@@ -20,6 +20,8 @@ bool execute_line(const char *input) {
     } else if (expr->type == EXPR_QUIT) {
         // is this a case?
         return true;
+    } else if (!check(*expr, arena)) {
+        // No op
     } else {
         double result = evaluate(*expr);
         printf("%f\n", result);

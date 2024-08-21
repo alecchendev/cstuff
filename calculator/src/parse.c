@@ -13,7 +13,6 @@ typedef struct BinaryExpr BinaryExpr;
 
 struct Constant {
     double value;
-    Unit unit;
 };
 
 struct BinaryExpr {
@@ -37,6 +36,7 @@ typedef union {
 } ExprData;
 
 struct Expression {
+    Unit unit;
     ExprType type;
     ExprData expr;
 };
@@ -65,7 +65,7 @@ Expression *parse(TokenString tokens, Arena *arena) {
         Expression *expr = arena_alloc(arena, sizeof(Expression));
         expr->type = EXPR_CONSTANT;
         expr->expr.constant.value = tokens.tokens[0].number;
-        expr->expr.constant.unit = UNIT_NONE;
+        expr->unit = UNIT_NONE;
         /*printf("constant\n");*/
         return expr;
     }
@@ -82,7 +82,7 @@ Expression *parse(TokenString tokens, Arena *arena) {
         Expression *expr = arena_alloc(arena, sizeof(Expression));
         expr->type = EXPR_CONSTANT;
         expr->expr.constant.value = tokens.tokens[0].number;
-        expr->expr.constant.unit = tokens.tokens[1].unit;
+        expr->unit = tokens.tokens[1].unit;
         /*printf("constant with unit\n");*/
         return expr;
     }
@@ -130,7 +130,54 @@ Expression *parse(TokenString tokens, Arena *arena) {
     }
     expr->expr.binary_expr.right = right;
 
+    if (left->unit == UNIT_NONE) {
+        expr->unit = right->unit;
+    } else if (right->unit == UNIT_NONE) {
+        expr->unit = left->unit;
+    } else if (left->unit == right->unit) {
+        expr->unit = left->unit;
+    } else {
+        expr->unit = UNIT_UNKNOWN; // TODO: implement composite units
+    }
+
     return expr;
+}
+
+unsigned char display_expr_op(ExprType type) {
+    switch (type) {
+        case EXPR_ADD:
+            return '+';
+        case EXPR_SUB:
+            return '-';
+        case EXPR_MUL:
+            return '*';
+        case EXPR_DIV:
+            return '/';
+        default:
+            return '?';
+    }
+}
+
+bool check(Expression expr, Arena *arena) {
+    if (expr.type == EXPR_CONSTANT) {
+        return true;
+    }
+    Expression left = *expr.expr.binary_expr.left;
+    Expression right = *expr.expr.binary_expr.right;
+    bool left_check = check(left, arena);
+    bool right_check = check(right, arena);
+    if (!left_check || !right_check) {
+        return false;
+    }
+    if ((expr.type == EXPR_ADD || expr.type == EXPR_SUB) &&
+        left.unit != UNIT_NONE && right.unit != UNIT_NONE &&
+        left.unit != right.unit) {
+        printf("Units do not match: %lf %s %c %lf %s\n",
+               left.expr.constant.value, unit_strings[left.unit], display_expr_op(expr.type),
+               right.expr.constant.value, unit_strings[right.unit]);
+        return false;
+    }
+    return true;
 }
 
 double evaluate(Expression expr) {
