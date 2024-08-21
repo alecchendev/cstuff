@@ -1,9 +1,10 @@
 
 #include <unistd.h>
 #include <stdio.h>
+#include "arena.c"
+#include "execute.c"
 #include "parse.c"
 #include "tokenize.c"
-#include "arena.c"
 
 #define assert(condition) \
     ((condition) ? (void)0 : \
@@ -42,8 +43,6 @@ bool fork_test_case(size_t case_num, void (*test)(void *), void *c_opaque,
         }
     }
 }
-
-const size_t MAX_MEMORY_SIZE = MAX_INPUT * sizeof(Token) + MAX_INPUT * sizeof(Expression);
 
 typedef struct TokenCase TokenCase;
 struct TokenCase {

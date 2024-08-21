@@ -26,7 +26,6 @@ struct Token {
 };
 
 #define MAX_INPUT 256
-const char *prompt = ">>> ";
 
 // TODO: turn this into something simpler at comptime
 bool char_in_set(char c, const unsigned char *set) {
