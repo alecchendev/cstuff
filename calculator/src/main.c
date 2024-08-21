@@ -15,9 +15,9 @@ bool execute_line(const char *input) {
     Expression *expr = parse(tokens, arena);
     if (expr == NULL) {
         printf("Invalid expression\n");
-    } else if (expr->type == EMPTY) {
+    } else if (expr->type == EXPR_EMPTY) {
         // no op
-    } else if (expr->type == QUIT) {
+    } else if (expr->type == EXPR_QUIT) {
         // is this a case?
         return true;
     } else {

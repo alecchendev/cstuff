@@ -16,16 +16,18 @@ struct Constant {
 };
 
 struct BinaryExpr {
-    BinaryOp operator;
     Expression *left;
     Expression *right;
 };
 
 typedef enum {
-    CONSTANT,
-    BINARY_OP,
-    EMPTY,
-    QUIT,
+    EXPR_CONSTANT,
+    EXPR_ADD,
+    EXPR_SUB,
+    EXPR_MUL,
+    EXPR_DIV,
+    EXPR_EMPTY,
+    EXPR_QUIT,
 } ExprType;
 
 typedef union {
@@ -48,19 +50,19 @@ int precedence(BinaryOp op) {
 Expression *parse(TokenString tokens, Arena *arena) {
     if (tokens.length == 0 || (tokens.length == 1 && tokens.tokens[0].type == END)) {
         Expression *expr = arena_alloc(arena, sizeof(Expression));
-        *expr = (Expression) { .type = EMPTY };
+        *expr = (Expression) { .type = EXPR_EMPTY };
         /*printf("empty\n");*/
         return expr;
     }
     if (tokens.length == 1 && tokens.tokens[0].type == QUITTOKEN) {
         Expression *expr = arena_alloc(arena, sizeof(Expression));
-        *expr = (Expression) { .type = QUIT };
+        *expr = (Expression) { .type = EXPR_QUIT };
         /*printf("quit\n");*/
         return expr;
     }
     if (tokens.length == 1 && tokens.tokens[0].type == NUMBER) {
         Expression *expr = arena_alloc(arena, sizeof(Expression));
-        expr->type = CONSTANT;
+        expr->type = EXPR_CONSTANT;
         expr->expr.constant.value = tokens.tokens[0].data.number;
         /*printf("constant\n");*/
         return expr;
@@ -94,19 +96,26 @@ Expression *parse(TokenString tokens, Arena *arena) {
     if (op != NOOP) {
         /*printf("found operator %d at %zu\n", op, op_index);*/
         Expression *expr = arena_alloc(arena, sizeof(Expression));
-        expr->type = BINARY_OP;
-        expr->expr.binary_expr.operator = op;
+        if (op == ADD) {
+            expr->type = EXPR_ADD;
+        } else if (op == SUB) {
+            expr->type = EXPR_SUB;
+        } else if (op == MUL) {
+            expr->type = EXPR_MUL;
+        } else if (op == DIV) {
+            expr->type = EXPR_DIV;
+        }
 
         TokenString left_tokens = { .tokens = tokens.tokens, .length = op_index };
         Expression *left = parse(left_tokens, arena);
-        if (left == NULL || left->type == EMPTY || left->type == QUIT) {
+        if (left == NULL || left->type == EXPR_EMPTY || left->type == EXPR_QUIT) {
             return left;
         }
         expr->expr.binary_expr.left = left;
 
         TokenString right_tokens = { .tokens = tokens.tokens + op_index + 1, .length = tokens.length - op_index - 1 };
         Expression *right = parse(right_tokens, arena);
-        if (right == NULL || right->type == EMPTY || right->type == QUIT) {
+        if (right == NULL || right->type == EXPR_EMPTY || right->type == EXPR_QUIT) {
             return right;
         }
         expr->expr.binary_expr.right = right;
@@ -119,24 +128,21 @@ Expression *parse(TokenString tokens, Arena *arena) {
 }
 
 double evaluate(Expression expr) {
-    if (expr.type == CONSTANT) {
+    if (expr.type == EXPR_CONSTANT) {
         return expr.expr.constant.value;
     }
-    if (expr.type == BINARY_OP) {
-        double left = evaluate(*expr.expr.binary_expr.left);
-        double right = evaluate(*expr.expr.binary_expr.right);
-        switch (expr.expr.binary_expr.operator) {
-            case ADD:
-                return left + right;
-            case SUB:
-                return left - right;
-            case MUL:
-                return left * right;
-            case DIV:
-                return left / right;
-            case NOOP:
-                exit(1); // TODO
-        }
+    double left = evaluate(*expr.expr.binary_expr.left);
+    double right = evaluate(*expr.expr.binary_expr.right);
+    switch (expr.type) {
+        case EXPR_ADD:
+            return left + right;
+        case EXPR_SUB:
+            return left - right;
+        case EXPR_MUL:
+            return left * right;
+        case EXPR_DIV:
+            return left / right;
+        default:
+            exit(1); // TODO
     }
-    exit(1); // TODO
 }
