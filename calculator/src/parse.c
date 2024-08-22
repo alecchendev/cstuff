@@ -36,10 +36,32 @@ typedef union {
 } ExprData;
 
 struct Expression {
-    Unit unit;
+    UnitType unit;
     ExprType type;
     ExprData expr;
 };
+
+Expression expr_new_const_unit(double value, UnitType unit) {
+    return (Expression) {
+        .unit = unit,
+        .type = EXPR_CONSTANT,
+        .expr = { .constant = { .value = value } },
+    };
+}
+
+Expression expr_new_const(double value) {
+    return expr_new_const_unit(value, UNIT_NONE);
+}
+
+// This should only be used for tests, otherwise
+// we need to make sure left and right remain valid.
+Expression expr_new_bin(ExprType type, Expression left, Expression right) {
+    return (Expression) {
+        .unit = UNIT_NONE,
+        .type = type,
+        .expr = { .binary_expr = { .left = &left, .right = &right } },
+    };
+}
 
 // Precedence - lower number means this should be evaluated first
 int precedence(TokenType op) {

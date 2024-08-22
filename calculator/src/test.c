@@ -67,6 +67,9 @@ void test_tokenize_case(void *c_opaque) {
     TokenCase c = *(TokenCase *)c_opaque;
     Arena *arena = arena_create(MAX_MEMORY_SIZE);
     TokenString tokens = tokenize(c.input, arena);
+    /*for (size_t i = 0; i < tokens.length; i++) {*/
+    /*    token_display(tokens.tokens[i]);*/
+    /*}*/
     assert_eq(tokens.length, c.length);
     for (size_t i = 0; i < tokens.length; i++) {
         assert(tokens_equal(tokens.tokens[i], c.expected[i]));
@@ -100,13 +103,72 @@ void test_tokenize(void *_) {
         {"3 cm + 5.5min", 6, {
             token_new_num(3), token_new_unit(UNIT_CENTIMETER), add_token,
             token_new_num(5.5), token_new_unit(UNIT_MINUTE), end_token
-        }}
+        }},
+        {"1 mi / h", 5, {
+            token_new_num(1), token_new_unit(UNIT_MILE), div_token,
+            token_new_unit(UNIT_HOUR), end_token
+        }},
         // TODO: more comprehensive
     };
     const size_t num_cases = sizeof(cases) / sizeof(TokenCase);
     bool all_passed = true;
     for (size_t i = 0; i < num_cases; i++) {
         all_passed &= fork_test_case(i, test_tokenize_case, (void *)&cases[i],
+                                     NULL, "Case %zu failed\n");
+    }
+    assert(all_passed);
+}
+
+typedef struct {
+    const char *input;
+    const Expression expected;
+} ParseCase;
+
+bool exprs_equal(Expression a, Expression b) {
+    if (a.type != b.type) {
+        printf("Expected type %d, got %d\n", b.type, a.type);
+        return false;
+    }
+    if (a.type == EXPR_EMPTY || a.type == EXPR_QUIT) {
+        return true;
+    }
+    if (a.unit != b.unit) {
+        printf("Expected unit %s, got %s\n", unit_strings[b.unit], unit_strings[a.unit]);
+        return false;
+    }
+    if (a.type == EXPR_CONSTANT && a.expr.constant.value - b.expr.constant.value > 0.0000001) {
+        printf("Expected number %f, got %f\n", b.expr.constant.value, a.expr.constant.value);
+        return false;
+    } else if (a.type == EXPR_CONSTANT) {
+        return true;
+    }
+    assert(a.type == EXPR_ADD || a.type == EXPR_SUB || a.type == EXPR_MUL || a.type == EXPR_DIV);
+    if (!exprs_equal(*a.expr.binary_expr.left, *b.expr.binary_expr.left)) {
+        return false;
+    }
+    if (!exprs_equal(*a.expr.binary_expr.right, *b.expr.binary_expr.right)) {
+        return false;
+    }
+    return true;
+}
+
+void test_parse_case(void *c_opaque) {
+    ParseCase *c = (ParseCase *)c_opaque;
+    Arena *arena = arena_create(MAX_MEMORY_SIZE);
+    TokenString tokens = tokenize(c->input, arena);
+    Expression *expr = parse(tokens, arena);
+    assert(exprs_equal(*expr, c->expected));
+    arena_free(arena);
+}
+
+void test_parse(void *_) {
+    const ParseCase cases[] = {
+        {"1 + 2 * 3", expr_new_bin(EXPR_ADD, expr_new_const(1), expr_new_bin(EXPR_MUL, expr_new_const(2), expr_new_const(3)))},
+    };
+    const size_t num_cases = sizeof(cases) / sizeof(ParseCase);
+    bool all_passed = true;
+    for (size_t i = 0; i < num_cases; i++) {
+        all_passed &= fork_test_case(i, test_parse_case, (void *)&cases[i],
                                      NULL, "Case %zu failed\n");
     }
     assert(all_passed);
@@ -157,6 +219,7 @@ void test_evaluate(void *_) {
 int main() {
     void (*tests[])(void *) = {
         test_tokenize,
+        test_parse,
         test_evaluate,
     };
     const size_t n_tests = sizeof(tests) / sizeof(tests[0]);

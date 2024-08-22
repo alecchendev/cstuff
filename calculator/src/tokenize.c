@@ -6,8 +6,8 @@
 #include <string.h>
 #include "arena.c"
 
-typedef enum Unit Unit;
-enum Unit {
+typedef enum UnitType UnitType;
+enum UnitType {
     // Distance
     UNIT_CENTIMETER,
     UNIT_METER,
@@ -43,7 +43,7 @@ const char *unit_strings[] = {
     // Time
     "s",
     "min",
-    "hr",
+    "h",
     // Mass
     "g",
     "kg",
@@ -72,7 +72,7 @@ enum TokenType {
 typedef struct Token Token;
 struct Token {
     TokenType type;
-    Unit unit;
+    UnitType unit;
     double number;
 };
 
@@ -112,7 +112,7 @@ Token token_new_num(double num) {
     return (Token){TOK_NUM, .number = num };
 }
 
-Token token_new_unit(Unit unit) {
+Token token_new_unit(UnitType unit) {
     return (Token){TOK_UNIT, .unit = unit};
 }
 
