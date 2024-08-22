@@ -56,6 +56,13 @@ bool tokens_equal(Token a, Token b) {
         printf("Expected type %d, got %d\n", b.type, a.type);
         return false;
     }
+    if (a.type == TOK_WHITESPACE || a.type == TOK_INVALID || a.type == TOK_END || a.type == TOK_QUIT) {
+        return true;
+    }
+    if (a.type == TOK_UNIT && a.unit_type != b.unit_type) {
+        printf("Expected unit type %s, got %s\n", unit_strings[b.unit_type], unit_strings[a.unit_type]);
+        return false;
+    }
     if (a.type == TOK_NUM && a.number - b.number > 0.0000001) {
         printf("Expected number %f, got %f\n", b.number, a.number);
         return false;
@@ -121,7 +128,7 @@ void test_tokenize(void *_) {
 
 typedef struct {
     const char *input;
-    const Expression expected;
+    const Expression *expected;
 } ParseCase;
 
 bool exprs_equal(Expression a, Expression b) {
@@ -132,8 +139,7 @@ bool exprs_equal(Expression a, Expression b) {
     if (a.type == EXPR_EMPTY || a.type == EXPR_QUIT) {
         return true;
     }
-    if (a.unit != b.unit) {
-        printf("Expected unit %s, got %s\n", unit_strings[b.unit], unit_strings[a.unit]);
+    if (!units_equal(a.unit, b.unit)) {
         return false;
     }
     if (a.type == EXPR_CONSTANT && a.expr.constant.value - b.expr.constant.value > 0.0000001) {
@@ -157,13 +163,31 @@ void test_parse_case(void *c_opaque) {
     Arena *arena = arena_create(MAX_MEMORY_SIZE);
     TokenString tokens = tokenize(c->input, arena);
     Expression *expr = parse(tokens, arena);
-    assert(exprs_equal(*expr, c->expected));
+    assert(exprs_equal(*expr, *c->expected));
     arena_free(arena);
 }
 
 void test_parse(void *_) {
+    Arena *case_arena = arena_create(MAX_MEMORY_SIZE);
+    UnitType mi_h[] = {UNIT_MILE, UNIT_HOUR};
+    int mi_h_degrees[] = {1, -1};
     const ParseCase cases[] = {
-        {"1 + 2 * 3", expr_new_bin(EXPR_ADD, expr_new_const(1), expr_new_bin(EXPR_MUL, expr_new_const(2), expr_new_const(3)))},
+        {"1 + 2 * 3", expr_new_bin(EXPR_ADD,
+            expr_new_const(1, case_arena),
+            expr_new_bin(EXPR_MUL,
+                expr_new_const(2, case_arena),
+                expr_new_const(3, case_arena),
+            case_arena),
+        case_arena)},
+        {"1 cm -2kg", expr_new_bin_unit(unit_new_unknown(case_arena), EXPR_SUB,
+            expr_new_const_unit(1, unit_new_single(UNIT_CENTIMETER, 1, case_arena), case_arena),
+            expr_new_const_unit(2, unit_new_single(UNIT_KILOGRAM, 1, case_arena), case_arena),
+        case_arena)},
+        // TODO: implement composite types so this passes
+        /*{"5 mi / 4 h", expr_new_bin_unit(unit_new_many(mi_h, mi_h_degrees, 2, case_arena), EXPR_DIV,*/
+        /*    expr_new_const_unit(5, unit_new_single(UNIT_MILE, 1, case_arena), case_arena),*/
+        /*    expr_new_const_unit(4, unit_new_single(UNIT_HOUR, 1, case_arena), case_arena),*/
+        /*case_arena)},*/
     };
     const size_t num_cases = sizeof(cases) / sizeof(ParseCase);
     bool all_passed = true;
@@ -216,11 +240,35 @@ void test_evaluate(void *_) {
     assert(all_passed);
 }
 
+typedef struct {
+    const Unit unit;
+    const char *expected;
+} DisplayUnitCase;
+
+void test_display_unit(void *_) {
+    Arena *arena = arena_create(MAX_MEMORY_SIZE);
+    DisplayUnitCase cases[] = {
+        {unit_new_none(arena), ""},
+        {unit_new_single(UNIT_MINUTE, 1, arena), "min"},
+        {unit_new_single(UNIT_CENTIMETER, 2, arena), "cm^2"},
+        {unit_new_single(UNIT_KILOGRAM, -2, arena), "kg^-2"},
+        {unit_new_unknown(arena), "unknown"},
+    };
+    const size_t num_cases = sizeof(cases) / sizeof(DisplayUnitCase);
+    for (size_t i = 0; i < num_cases; i++) {
+        char *displayed = display_unit(cases[i].unit, arena);
+        /*printf("Expected: %s got: %s\n", cases[i].expected, displayed);*/
+        assert(strncmp(displayed, cases[i].expected, MAX_COMPOSITE_UNIT_STRING) == 0);
+    }
+    arena_free(arena);
+}
+
 int main() {
     void (*tests[])(void *) = {
         test_tokenize,
         test_parse,
         test_evaluate,
+        test_display_unit,
     };
     const size_t n_tests = sizeof(tests) / sizeof(tests[0]);
     bool all_passed = true;

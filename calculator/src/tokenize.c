@@ -5,55 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "arena.c"
-
-typedef enum UnitType UnitType;
-enum UnitType {
-    // Distance
-    UNIT_CENTIMETER,
-    UNIT_METER,
-    UNIT_KILOMETER,
-    UNIT_INCH,
-    UNIT_FOOT,
-    UNIT_MILE,
-    // Time
-    UNIT_SECOND,
-    UNIT_MINUTE,
-    UNIT_HOUR,
-    // Mass
-    UNIT_GRAM,
-    UNIT_KILOGRAM,
-    UNIT_POUND,
-    UNIT_OUNCE,
-
-    UNIT_COUNT,
-    UNIT_NONE,
-    UNIT_UNKNOWN,
-};
-
-#define MAX_UNIT_STRING 3
-
-const char *unit_strings[] = {
-    // Distance
-    "cm",
-    "m",
-    "km",
-    "in",
-    "ft",
-    "mi",
-    // Time
-    "s",
-    "min",
-    "h",
-    // Mass
-    "g",
-    "kg",
-    "lb",
-    "oz",
-
-    "",
-    "none",
-    "unknown",
-};
+#include "unit.c"
 
 typedef enum TokenType TokenType;
 enum TokenType {
@@ -72,7 +24,7 @@ enum TokenType {
 typedef struct Token Token;
 struct Token {
     TokenType type;
-    UnitType unit;
+    UnitType unit_type;
     double number;
 };
 
@@ -113,7 +65,7 @@ Token token_new_num(double num) {
 }
 
 Token token_new_unit(UnitType unit) {
-    return (Token){TOK_UNIT, .unit = unit};
+    return (Token){TOK_UNIT, .unit_type = unit};
 }
 
 // TODO: make this more generic where I can simply define
@@ -141,7 +93,7 @@ Token next_token(const char *input, size_t *pos, size_t length) {
             const size_t len = strnlen(unit_str, MAX_UNIT_STRING + 1);
             const size_t str_len = strnlen(string_token, MAX_UNIT_STRING + 1);
             if (str_len == len && strncmp(string_token, unit_str, len + 1) == 0) {
-                return (Token){TOK_UNIT, .unit = unit};
+                return (Token){TOK_UNIT, .unit_type = unit};
             }
         }
         return invalid_token;
@@ -261,6 +213,12 @@ void token_display(Token token) {
             break;
         case TOK_DIV:
             printf("Division token\n");
+            break;
+        case TOK_WHITESPACE:
+            printf("Whitespace token\n");
+            break;
+        case TOK_UNIT:
+            printf("Unit token: %s\n", unit_strings[token.unit_type]);
             break;
         default:
             printf("Unknown token\n");
