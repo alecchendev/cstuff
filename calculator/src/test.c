@@ -72,8 +72,8 @@ bool tokens_equal(Token a, Token b) {
 
 void test_tokenize_case(void *c_opaque) {
     TokenCase c = *(TokenCase *)c_opaque;
-    Arena *arena = arena_create(MAX_MEMORY_SIZE);
-    TokenString tokens = tokenize(c.input, arena);
+    Arena arena = arena_create(MAX_MEMORY_SIZE);
+    TokenString tokens = tokenize(c.input, &arena);
     for (size_t i = 0; i < tokens.length; i++) {
         token_display(tokens.tokens[i]);
     }
@@ -160,34 +160,34 @@ bool exprs_equal(Expression a, Expression b) {
 
 void test_parse_case(void *c_opaque) {
     ParseCase *c = (ParseCase *)c_opaque;
-    Arena *arena = arena_create(MAX_MEMORY_SIZE);
-    TokenString tokens = tokenize(c->input, arena);
-    Expression *expr = parse(tokens, arena);
+    Arena arena = arena_create(MAX_MEMORY_SIZE);
+    TokenString tokens = tokenize(c->input, &arena);
+    Expression *expr = parse(tokens, &arena);
     assert(exprs_equal(*expr, *c->expected));
     arena_free(arena);
 }
 
 void test_parse(void *_) {
-    Arena *case_arena = arena_create(MAX_MEMORY_SIZE);
+    Arena case_arena = arena_create(MAX_MEMORY_SIZE);
     UnitType mi_h[] = {UNIT_MILE, UNIT_HOUR};
     int mi_h_degrees[] = {1, -1};
     const ParseCase cases[] = {
         {"1 + 2 * 3", expr_new_bin(EXPR_ADD,
-            expr_new_const(1, case_arena),
+            expr_new_const(1, &case_arena),
             expr_new_bin(EXPR_MUL,
-                expr_new_const(2, case_arena),
-                expr_new_const(3, case_arena),
-            case_arena),
-        case_arena)},
-        {"1 cm -2kg", expr_new_bin_unit(unit_new_unknown(case_arena), EXPR_SUB,
-            expr_new_const_unit(1, unit_new_single(UNIT_CENTIMETER, 1, case_arena), case_arena),
-            expr_new_const_unit(2, unit_new_single(UNIT_KILOGRAM, 1, case_arena), case_arena),
-        case_arena)},
+                expr_new_const(2, &case_arena),
+                expr_new_const(3, &case_arena),
+            &case_arena),
+        &case_arena)},
+        {"1 cm -2kg", expr_new_bin_unit(unit_new_unknown(&case_arena), EXPR_SUB,
+            expr_new_const_unit(1, unit_new_single(UNIT_CENTIMETER, 1, &case_arena), &case_arena),
+            expr_new_const_unit(2, unit_new_single(UNIT_KILOGRAM, 1, &case_arena), &case_arena),
+        &case_arena)},
         // TODO: implement composite types so this passes
-        /*{"5 mi / 4 h", expr_new_bin_unit(unit_new_many(mi_h, mi_h_degrees, 2, case_arena), EXPR_DIV,*/
-        /*    expr_new_const_unit(5, unit_new_single(UNIT_MILE, 1, case_arena), case_arena),*/
-        /*    expr_new_const_unit(4, unit_new_single(UNIT_HOUR, 1, case_arena), case_arena),*/
-        /*case_arena)},*/
+        /*{"5 mi / 4 h", expr_new_bin_unit(unit_new_many(mi_h, mi_h_degrees, 2, &case_arena), EXPR_DIV,*/
+        /*    expr_new_const_unit(5, unit_new_single(UNIT_MILE, 1, &case_arena), &case_arena),*/
+        /*    expr_new_const_unit(4, unit_new_single(UNIT_HOUR, 1, &case_arena), &case_arena),*/
+        /*&case_arena)},*/
     };
     const size_t num_cases = sizeof(cases) / sizeof(ParseCase);
     bool all_passed = true;
@@ -196,6 +196,7 @@ void test_parse(void *_) {
                                      NULL, "Case %zu failed\n");
     }
     assert(all_passed);
+    arena_free(case_arena);
 }
 
 typedef struct {
@@ -205,9 +206,9 @@ typedef struct {
 
 void test_evaluate_case(void *c_opaque) {
     EvaluateCase *c = (EvaluateCase *)c_opaque;
-    Arena *arena = arena_create(MAX_MEMORY_SIZE);
-    TokenString tokens = tokenize(c->input, arena);
-    Expression *expr = parse(tokens, arena);
+    Arena arena = arena_create(MAX_MEMORY_SIZE);
+    TokenString tokens = tokenize(c->input, &arena);
+    Expression *expr = parse(tokens, &arena);
     assert(expr != NULL);
     double result = evaluate(*expr);
     assert_eq(result, c->expected);
@@ -246,17 +247,17 @@ typedef struct {
 } DisplayUnitCase;
 
 void test_display_unit(void *_) {
-    Arena *arena = arena_create(MAX_MEMORY_SIZE);
+    Arena arena = arena_create(MAX_MEMORY_SIZE);
     DisplayUnitCase cases[] = {
-        {unit_new_none(arena), ""},
-        {unit_new_single(UNIT_MINUTE, 1, arena), "min"},
-        {unit_new_single(UNIT_CENTIMETER, 2, arena), "cm^2"},
-        {unit_new_single(UNIT_KILOGRAM, -2, arena), "kg^-2"},
-        {unit_new_unknown(arena), "unknown"},
+        {unit_new_none(&arena), ""},
+        {unit_new_single(UNIT_MINUTE, 1, &arena), "min"},
+        {unit_new_single(UNIT_CENTIMETER, 2, &arena), "cm^2"},
+        {unit_new_single(UNIT_KILOGRAM, -2, &arena), "kg^-2"},
+        {unit_new_unknown(&arena), "unknown"},
     };
     const size_t num_cases = sizeof(cases) / sizeof(DisplayUnitCase);
     for (size_t i = 0; i < num_cases; i++) {
-        char *displayed = display_unit(cases[i].unit, arena);
+        char *displayed = display_unit(cases[i].unit, &arena);
         debug("Expected: %s got: %s\n", cases[i].expected, displayed);
         assert(strncmp(displayed, cases[i].expected, MAX_COMPOSITE_UNIT_STRING) == 0);
     }

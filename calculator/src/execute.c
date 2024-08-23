@@ -10,9 +10,9 @@ const size_t MAX_MEMORY_SIZE = MAX_INPUT * sizeof(Token) + MAX_INPUT * sizeof(Ex
 
 // TODO make this + repl more testable..?
 bool execute_line(const char *input) {
-    Arena *arena = arena_create(MAX_MEMORY_SIZE);
-    TokenString tokens = tokenize(input, arena);
-    Expression *expr = parse(tokens, arena);
+    Arena arena = arena_create(MAX_MEMORY_SIZE);
+    TokenString tokens = tokenize(input, &arena);
+    Expression *expr = parse(tokens, &arena);
     if (expr == NULL) {
         printf("Invalid expression\n");
     } else if (expr->type == EXPR_EMPTY) {
@@ -20,7 +20,7 @@ bool execute_line(const char *input) {
     } else if (expr->type == EXPR_QUIT) {
         // is this a case?
         return true;
-    } else if (!check(*expr, arena)) {
+    } else if (!check(*expr, &arena)) {
         // No op
     } else {
         double result = evaluate(*expr);
@@ -143,9 +143,9 @@ void repl(FILE *input_fd) {
         exit(1); // TODO handle differently?
     }
 
-    Arena *history_arena = arena_create(MAX_HISTORY_MEMORY);
+    Arena history_arena = arena_create(MAX_HISTORY_MEMORY);
     History history = { .history = NULL, .len = 0, .pos = 0 };
-    history.history = arena_alloc(history_arena, sizeof(Input) * MAX_HISTORY);
+    history.history = arena_alloc(&history_arena, sizeof(Input) * MAX_HISTORY);
 
     bool done = false;
     while (!done) {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -8,14 +9,14 @@ typedef struct Arena Arena;
 struct Arena {
     size_t size;
     size_t used;
-    char memory[];
+    unsigned char *memory;
 };
 
-Arena *arena_create(size_t size) {
-    Arena *arena = malloc(sizeof(Arena) + size);
-    arena->size = size;
-    arena->used = 0;
-    // arena->memory already points to the start of the memory block
+Arena arena_create(size_t size) {
+    Arena arena;
+    arena.size = size;
+    arena.used = 0;
+    arena.memory = malloc(size);
     return arena;
 }
 
@@ -29,7 +30,7 @@ void *arena_alloc(Arena *arena, size_t size) {
     return ptr;
 }
 
-void arena_free(Arena *arena) {
-    free(arena);
+void arena_free(Arena arena) {
+    free(arena.memory);
 }
 
