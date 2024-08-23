@@ -37,7 +37,7 @@ bool char_in_set(char c, const unsigned char *set) {
     for (size_t i = 0; set[i] != '\0'; i++) {
         char_set[set[i]] = true;
     }
-    return char_set[c];
+    return char_set[(int)c];
 }
 
 bool is_digit(char c) {
@@ -94,7 +94,7 @@ Token next_token(const char *input, size_t *pos, size_t length) {
             const size_t len = strnlen(unit_str, MAX_UNIT_STRING + 1);
             const size_t str_len = strnlen(string_token, MAX_UNIT_STRING + 1);
             if (str_len == len && strncmp(string_token, unit_str, len + 1) == 0) {
-                return (Token){TOK_UNIT, .unit_type = unit};
+                return token_new_unit(unit);
             }
         }
         return invalid_token;
@@ -110,14 +110,14 @@ Token next_token(const char *input, size_t *pos, size_t length) {
 
     const unsigned char operators[] = {'+', '-', '*', '/'};
     if (char_in_set(input[*pos], operators)) {
-        Token token;
+        Token token = invalid_token;
         if (input[*pos] == '+') {
             token = add_token;
         } else if (input[*pos] == '-') {
             token = sub_token;
         } else if (input[*pos] == '*') {
             token = mul_token;
-        } else if (input[*pos] == '/') {
+        } else {
             token = div_token;
         }
         (*pos)++;

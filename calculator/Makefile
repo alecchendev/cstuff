@@ -1,4 +1,4 @@
-CFLAGS = -g
+CFLAGS = -Wall -g
 
 # Check if DEBUG is set from command line
 ifdef DEBUG
