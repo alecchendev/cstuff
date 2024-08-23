@@ -14,6 +14,7 @@ typedef struct BinaryExpr BinaryExpr;
 
 struct Constant {
     double value;
+    Unit unit;
 };
 
 struct BinaryExpr {
@@ -37,7 +38,6 @@ typedef union {
 } ExprData;
 
 struct Expression {
-    Unit unit;
     ExprType type;
     ExprData expr;
 };
@@ -47,9 +47,8 @@ struct Expression {
 Expression *expr_new_const_unit(double value, Unit unit, Arena *arena) {
     Expression *expr = arena_alloc(arena, sizeof(Expression));
     *expr = (Expression) {
-        .unit = unit,
         .type = EXPR_CONSTANT,
-        .expr = { .constant = { .value = value } },
+        .expr = { .constant = { .value = value, .unit = unit } },
     };
     return expr;
 }
@@ -58,18 +57,13 @@ Expression *expr_new_const(double value, Arena *arena) {
     return expr_new_const_unit(value, unit_new_none(arena), arena);
 }
 
-Expression *expr_new_bin_unit(Unit unit, ExprType type, Expression *left, Expression *right, Arena *arena) {
+Expression *expr_new_bin(ExprType type, Expression *left, Expression *right, Arena *arena) {
     Expression *expr = arena_alloc(arena, sizeof(Expression));
     *expr = (Expression) {
-        .unit = unit,
         .type = type,
         .expr = { .binary_expr = { .left = left, .right = right } },
     };
     return expr;
-}
-
-Expression *expr_new_bin(ExprType type, Expression *left, Expression *right, Arena *arena) {
-    return expr_new_bin_unit(unit_new_none(arena), type, left, right, arena);
 }
 
 // Precedence - lower number means this should be evaluated first
@@ -96,7 +90,7 @@ Expression *parse(TokenString tokens, Arena *arena) {
         Expression *expr = arena_alloc(arena, sizeof(Expression));
         expr->type = EXPR_CONSTANT;
         expr->expr.constant.value = tokens.tokens[0].number;
-        expr->unit = unit_new_none(arena);
+        expr->expr.constant.unit = unit_new_none(arena);
         debug("constant\n");
         return expr;
     }
@@ -113,10 +107,11 @@ Expression *parse(TokenString tokens, Arena *arena) {
         Expression *expr = arena_alloc(arena, sizeof(Expression));
         expr->type = EXPR_CONSTANT;
         expr->expr.constant.value = tokens.tokens[0].number;
-        expr->unit = unit_new_single(tokens.tokens[1].unit_type, 1, arena);
+        expr->expr.constant.unit = unit_new_single(tokens.tokens[1].unit_type, 1, arena);
         debug("constant with unit\n");
         return expr;
     }
+    // TODO: parse composite units
 
     // Anything remaining should be a binary expression.
 
@@ -161,16 +156,6 @@ Expression *parse(TokenString tokens, Arena *arena) {
     }
     expr->expr.binary_expr.right = right;
 
-    if (is_unit_none(left->unit)) {
-        expr->unit = right->unit;
-    } else if (is_unit_none(right->unit)) {
-        expr->unit = left->unit;
-    } else if (units_equal(left->unit, right->unit)) {
-        expr->unit = left->unit;
-    } else {
-        expr->unit = unit_new_unknown(arena); // TODO: implement composite units
-    }
-
     return expr;
 }
 
@@ -194,38 +179,43 @@ void display_expr(size_t offset, Expression expr, Arena *arena) {
         debug("\t");
     }
     if (expr.type == EXPR_CONSTANT) {
-        debug("%lf %s\n", expr.expr.constant.value, display_unit(expr.unit, arena));
+        debug("%lf %s\n", expr.expr.constant.value, display_unit(expr.expr.constant.unit, arena));
     } else if (expr.type == EXPR_EMPTY) {
         debug("empty");
     } else if (expr.type == EXPR_QUIT) {
         debug("quit");
     } else {
-        debug("op: %c unit: %s\n", display_expr_op(expr.type), display_unit(expr.unit, arena));
+        debug("op: %c\n", display_expr_op(expr.type));
         display_expr(offset + 1, *expr.expr.binary_expr.left, arena);
         display_expr(offset + 1, *expr.expr.binary_expr.right, arena);
     }
 }
 
-bool check(Expression expr, Arena *arena) {
+Unit check_unit(Expression expr, Arena *arena) {
     if (expr.type == EXPR_CONSTANT) {
-        return true;
+        return expr.expr.constant.unit;
+    } else if (expr.type == EXPR_EMPTY || expr.type == EXPR_QUIT) {
+        return unit_new_unknown(arena);
     }
-    Expression left = *expr.expr.binary_expr.left;
-    Expression right = *expr.expr.binary_expr.right;
-    bool left_check = check(left, arena);
-    bool right_check = check(right, arena);
-    if (!left_check || !right_check) {
-        return false;
+    Unit left = check_unit(*expr.expr.binary_expr.left, arena);
+    Unit right = check_unit(*expr.expr.binary_expr.right, arena);
+    Unit unit = unit_new_unknown(arena);
+    if (is_unit_none(left)) {
+        unit = right;
+    } else if (is_unit_none(right)) {
+        unit = left;
+    } else if (units_equal(left, right)) {
+        unit = right;
+    } else if (is_unit_unknown(left) || is_unit_unknown(right)) {
+        // Case to make sure we don't print our error message again
+        unit = unit_new_unknown(arena);
+    } else {
+        printf("Units do not match: %s %c %s\n", display_unit(left, arena),
+           display_expr_op(expr.type), display_unit(right, arena));
+        unit = unit_new_unknown(arena);
     }
-    if ((expr.type == EXPR_ADD || expr.type == EXPR_SUB) &&
-        !is_unit_none(left.unit) && !is_unit_none(right.unit) &&
-        !units_equal(left.unit, right.unit)) {
-        printf("Units do not match: %lf %s %c %lf %s\n",
-               left.expr.constant.value, display_unit(left.unit, arena), display_expr_op(expr.type),
-               right.expr.constant.value, display_unit(right.unit, arena));
-        return false;
-    }
-    return true;
+    // TODO: implement composite units
+    return unit;
 }
 
 double evaluate(Expression expr) {

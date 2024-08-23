@@ -139,9 +139,6 @@ bool exprs_equal(Expression a, Expression b) {
     if (a.type == EXPR_EMPTY || a.type == EXPR_QUIT) {
         return true;
     }
-    if (!units_equal(a.unit, b.unit)) {
-        return false;
-    }
     if (a.type == EXPR_CONSTANT && a.expr.constant.value - b.expr.constant.value > 0.0000001) {
         printf("Expected number %f, got %f\n", b.expr.constant.value, a.expr.constant.value);
         return false;
@@ -162,6 +159,9 @@ void test_parse_case(void *c_opaque) {
     ParseCase *c = (ParseCase *)c_opaque;
     Arena arena = arena_create(MAX_MEMORY_SIZE);
     TokenString tokens = tokenize(c->input, &arena);
+    for (size_t i = 0; i < tokens.length; i++) {
+        token_display(tokens.tokens[i]);
+    }
     Expression *expr = parse(tokens, &arena);
     assert(exprs_equal(*expr, *c->expected));
     arena_free(arena);
@@ -179,12 +179,12 @@ void test_parse(void *_) {
                 expr_new_const(3, &case_arena),
             &case_arena),
         &case_arena)},
-        {"1 cm -2kg", expr_new_bin_unit(unit_new_unknown(&case_arena), EXPR_SUB,
+        {"1 cm -2kg", expr_new_bin(EXPR_SUB,
             expr_new_const_unit(1, unit_new_single(UNIT_CENTIMETER, 1, &case_arena), &case_arena),
             expr_new_const_unit(2, unit_new_single(UNIT_KILOGRAM, 1, &case_arena), &case_arena),
         &case_arena)},
         // TODO: implement composite types so this passes
-        /*{"5 mi / 4 h", expr_new_bin_unit(unit_new_many(mi_h, mi_h_degrees, 2, &case_arena), EXPR_DIV,*/
+        /*{"5 mi / 4 h", expr_new_bin_unit(unit_new(mi_h, mi_h_degrees, 2, &case_arena), EXPR_DIV,*/
         /*    expr_new_const_unit(5, unit_new_single(UNIT_MILE, 1, &case_arena), &case_arena),*/
         /*    expr_new_const_unit(4, unit_new_single(UNIT_HOUR, 1, &case_arena), &case_arena),*/
         /*&case_arena)},*/

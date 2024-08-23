@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include "arena.c"
+#include "log.c"
 
 typedef enum UnitType UnitType;
 enum UnitType {
@@ -68,7 +69,7 @@ bool is_unit_unknown(Unit unit) {
     return unit.length == 1 && unit.types[0] == UNIT_UNKNOWN;
 }
 
-Unit unit_new_many(UnitType types[], int degrees[], size_t length, Arena *arena) {
+Unit unit_new(UnitType types[], int degrees[], size_t length, Arena *arena) {
     UnitType *new_types = arena_alloc(arena, length * sizeof(UnitType));
     int *new_degrees = arena_alloc(arena, length * sizeof(int));
     memcpy(new_types, types, length * sizeof(UnitType));
@@ -77,7 +78,7 @@ Unit unit_new_many(UnitType types[], int degrees[], size_t length, Arena *arena)
 }
 
 Unit unit_new_single(UnitType type, int degree, Arena *arena) {
-    return unit_new_many(&type, &degree, 1, arena);
+    return unit_new(&type, &degree, 1, arena);
 }
 
 Unit unit_new_none(Arena *arena) {
