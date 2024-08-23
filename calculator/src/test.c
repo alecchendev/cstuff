@@ -74,9 +74,9 @@ void test_tokenize_case(void *c_opaque) {
     TokenCase c = *(TokenCase *)c_opaque;
     Arena *arena = arena_create(MAX_MEMORY_SIZE);
     TokenString tokens = tokenize(c.input, arena);
-    /*for (size_t i = 0; i < tokens.length; i++) {*/
-    /*    token_display(tokens.tokens[i]);*/
-    /*}*/
+    for (size_t i = 0; i < tokens.length; i++) {
+        token_display(tokens.tokens[i]);
+    }
     assert_eq(tokens.length, c.length);
     for (size_t i = 0; i < tokens.length; i++) {
         assert(tokens_equal(tokens.tokens[i], c.expected[i]));
@@ -257,7 +257,7 @@ void test_display_unit(void *_) {
     const size_t num_cases = sizeof(cases) / sizeof(DisplayUnitCase);
     for (size_t i = 0; i < num_cases; i++) {
         char *displayed = display_unit(cases[i].unit, arena);
-        /*printf("Expected: %s got: %s\n", cases[i].expected, displayed);*/
+        debug("Expected: %s got: %s\n", cases[i].expected, displayed);
         assert(strncmp(displayed, cases[i].expected, MAX_COMPOSITE_UNIT_STRING) == 0);
     }
     arena_free(arena);

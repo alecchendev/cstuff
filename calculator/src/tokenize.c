@@ -6,6 +6,7 @@
 #include <string.h>
 #include "arena.c"
 #include "unit.c"
+#include "log.c"
 
 typedef enum TokenType TokenType;
 enum TokenType {
@@ -191,37 +192,37 @@ TokenString tokenize(const char *input, Arena *arena) {
 void token_display(Token token) {
     switch (token.type) {
         case TOK_END:
-            printf("End of input\n");
+            debug("End of input\n");
             break;
         case TOK_INVALID:
-            printf("Invalid token\n");
+            debug("Invalid token\n");
             break;
         case TOK_QUIT:
-            printf("Quit token\n");
+            debug("Quit token\n");
             break;
         case TOK_NUM:
-            printf("Number: %f\n", token.number);
+            debug("Number: %f\n", token.number);
             break;
         case TOK_ADD:
-            printf("Addition token\n");
+            debug("Addition token\n");
             break;
         case TOK_SUB:
-            printf("Subtraction token\n");
+            debug("Subtraction token\n");
             break;
         case TOK_MUL:
-            printf("Multiplication token\n");
+            debug("Multiplication token\n");
             break;
         case TOK_DIV:
-            printf("Division token\n");
+            debug("Division token\n");
             break;
         case TOK_WHITESPACE:
-            printf("Whitespace token\n");
+            debug("Whitespace token\n");
             break;
         case TOK_UNIT:
-            printf("Unit token: %s\n", unit_strings[token.unit_type]);
+            debug("Unit token: %s\n", unit_strings[token.unit_type]);
             break;
         default:
-            printf("Unknown token\n");
+            debug("Unknown token\n");
             break;
     }
 }

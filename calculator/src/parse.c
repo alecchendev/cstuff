@@ -6,6 +6,7 @@
 #include <string.h>
 #include "tokenize.c"
 #include "arena.c"
+#include "log.c"
 
 typedef struct Expression Expression;
 typedef struct Constant Constant;
@@ -82,13 +83,13 @@ Expression *parse(TokenString tokens, Arena *arena) {
     if (tokens.length == 0 || (tokens.length == 1 && tokens.tokens[0].type == TOK_END)) {
         Expression *expr = arena_alloc(arena, sizeof(Expression));
         *expr = (Expression) { .type = EXPR_EMPTY };
-        /*printf("empty\n");*/
+        debug("empty\n");
         return expr;
     }
     if (tokens.length == 1 && tokens.tokens[0].type == TOK_QUIT) {
         Expression *expr = arena_alloc(arena, sizeof(Expression));
         *expr = (Expression) { .type = EXPR_QUIT };
-        /*printf("quit\n");*/
+        debug("quit\n");
         return expr;
     }
     if (tokens.length == 1 && tokens.tokens[0].type == TOK_NUM) {
@@ -96,15 +97,15 @@ Expression *parse(TokenString tokens, Arena *arena) {
         expr->type = EXPR_CONSTANT;
         expr->expr.constant.value = tokens.tokens[0].number;
         expr->unit = unit_new_none(arena);
-        /*printf("constant\n");*/
+        debug("constant\n");
         return expr;
     }
     if (tokens.length == 1) {
-        /*printf("Invalid expression token length 1\n");*/
+        debug("Invalid expression token length 1\n");
         return NULL;
     }
     if (tokens.length > 1 && tokens.tokens[tokens.length - 1].type == TOK_END) {
-        /*printf("Parsing end token\n");*/
+        debug("Parsing end token\n");
         return parse((TokenString) { .tokens = tokens.tokens, .length = tokens.length - 1 }, arena);
     }
     if (tokens.length == 2 && tokens.tokens[0].type == TOK_NUM
@@ -113,7 +114,7 @@ Expression *parse(TokenString tokens, Arena *arena) {
         expr->type = EXPR_CONSTANT;
         expr->expr.constant.value = tokens.tokens[0].number;
         expr->unit = unit_new_single(tokens.tokens[1].unit_type, 1, arena);
-        /*printf("constant with unit\n");*/
+        debug("constant with unit\n");
         return expr;
     }
 
@@ -190,16 +191,16 @@ unsigned char display_expr_op(ExprType type) {
 
 void display_expr(size_t offset, Expression expr, Arena *arena) {
     for (size_t i = 0; i < offset; i++) {
-        printf("\t");
+        debug("\t");
     }
     if (expr.type == EXPR_CONSTANT) {
-        printf("%lf %s\n", expr.expr.constant.value, display_unit(expr.unit, arena));
+        debug("%lf %s\n", expr.expr.constant.value, display_unit(expr.unit, arena));
     } else if (expr.type == EXPR_EMPTY) {
-        printf("empty");
+        debug("empty");
     } else if (expr.type == EXPR_QUIT) {
-        printf("quit");
+        debug("quit");
     } else {
-        printf("op: %c unit: %s\n", display_expr_op(expr.type), display_unit(expr.unit, arena));
+        debug("op: %c unit: %s\n", display_expr_op(expr.type), display_unit(expr.unit, arena));
         display_expr(offset + 1, *expr.expr.binary_expr.left, arena);
         display_expr(offset + 1, *expr.expr.binary_expr.right, arena);
     }

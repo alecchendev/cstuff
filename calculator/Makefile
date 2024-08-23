@@ -1,15 +1,28 @@
-all: build run
+CFLAGS = -g
 
-build: src
+# Check if DEBUG is set from command line
+ifdef DEBUG
+    CFLAGS += -DDEBUG
+endif
+
+all: run
+
+# Using this as prerequisite to force rebuild
+# so that we can easily rebuild the project
+# with debug logs with a CLI flag.
+.PHONY: force
+force:
+
+build: force
 	mkdir -p build
-	clang -g src/main.c -o build/main
+	clang $(CFLAGS) src/main.c -o build/main
 
-run:
+run: build
 	build/main
 
-build-test: src
+build-test: force
 	mkdir -p build
-	clang -g src/test.c -o build/test
+	clang $(CFLAGS) src/test.c -o build/test
 
 test: build-test
 	build/test
