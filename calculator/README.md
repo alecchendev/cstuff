@@ -51,8 +51,9 @@ To do:
     - [x] Handle negation
     - [ ] Tokenize + parse composite units
         - [x] Degrees of individual units
-        - [ ] Multiple units
+        - [x] Multiple units
     - [ ] Handle composite conversions
+- [ ] Unit aliases? I.e. force or newton -> kg m s^-2
 - [ ] Handle performing operations on the last result (expression starts with operation)
 - [ ] Let user define stuff
     - [ ] Handle basic variables

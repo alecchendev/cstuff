@@ -241,6 +241,8 @@ Unit unit_new_unknown(Arena *arena) {
 }
 
 Unit unit_combine(Unit a, Unit b, Arena *arena) {
+    if (is_unit_none(a)) return b;
+    if (is_unit_none(b)) return a;
     bool *a_leftover = arena_alloc(arena, a.length * sizeof(bool));
     bool *b_leftover = arena_alloc(arena, b.length * sizeof(bool));
     memset(a_leftover, true, a.length * sizeof(bool));
@@ -305,9 +307,9 @@ char *display_unit(Unit unit, Arena *arena) {
     for (size_t i = 0; i < unit.length; i++) {
         char unit_str[MAX_UNIT_WITH_DEGREE_STRING];
         if (unit.degrees[i] == 1) {
-            sprintf(unit_str, "%s", unit_strings[unit.types[i]]);
+            snprintf(unit_str, sizeof(unit_str), "%s", unit_strings[unit.types[i]]);
         } else {
-            sprintf(unit_str, "%s^%d", unit_strings[unit.types[i]], unit.degrees[i]);
+            snprintf(unit_str, sizeof(unit_str), "%s^%d", unit_strings[unit.types[i]], unit.degrees[i]);
         }
         strncat(str, unit_str, MAX_UNIT_WITH_DEGREE_STRING);
         if (i < unit.length - 1) {

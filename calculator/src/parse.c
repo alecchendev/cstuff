@@ -75,20 +75,26 @@ bool is_bin_op(TokenType type) {
             type == TOK_DIV || type == TOK_CARET || type == TOK_CONVERT;
 }
 
-// Precedence - lower number means this should be evaluated first
-int precedence(TokenType op, TokenType prev_token) {
-    if (op == TOK_SUB && (is_bin_op(prev_token) || prev_token == TOK_WHITESPACE)) return 1;
+// Precedence - lower number means this should be evaluated first (binds more tightly)
+int precedence(TokenType op, TokenType prev_token, size_t index) {
+    if (op == TOK_SUB && is_bin_op(prev_token)) return 1;
     if (op == TOK_CARET) return 2;
-    if (op == TOK_MUL || op == TOK_DIV) return 3;
-    if (op == TOK_ADD || op == TOK_SUB) return 4;
-    if (op == TOK_CONVERT) return 5;
+    if (op == TOK_UNIT && index != 0) return 3;
+    if (op == TOK_NUM && index == 0) return 4;
+    if (op == TOK_SUB && index == 0) return 5;
+    if (op == TOK_MUL || op == TOK_DIV) return 6;
+    if (op == TOK_ADD || op == TOK_SUB) return 7;
+    if (op == TOK_CONVERT) return 8;
     return 0; // error case, shouldn't matter
 }
 
 // True means take the last instance when evaluating equal precedence
-bool left_associative(TokenType op, TokenType prev_token) {
-    if (op == TOK_SUB && (is_bin_op(prev_token) || prev_token == TOK_WHITESPACE)) return false;
+bool left_associative(TokenType op, TokenType prev_token, size_t index) {
+    if (op == TOK_SUB && is_bin_op(prev_token)) return false;
     if (op == TOK_CARET) return true; // Doesn't apply yet
+    if (op == TOK_UNIT && index != 0) return true;
+    if (op == TOK_NUM && index == 0) return false;
+    if (op == TOK_SUB && index == 0) return false; // Doesn't apply
     if (op == TOK_MUL || op == TOK_DIV) return true;
     if (op == TOK_ADD || op == TOK_SUB) return true;
     if (op == TOK_CONVERT) return true; // Doesn't apply
@@ -135,18 +141,6 @@ Expression *parse(TokenString tokens, Arena *arena) {
         debug("Parsing end token\n");
         return parse((TokenString) { .tokens = tokens.tokens, .length = tokens.length - 1 }, arena);
     }
-    if (tokens.length == 2 && tokens.tokens[0].type == TOK_NUM
-        && tokens.tokens[1].type == TOK_UNIT) {
-        Expression *expr = arena_alloc(arena, sizeof(Expression));
-        expr->type = EXPR_CONSTANT;
-        expr->expr.constant.value = tokens.tokens[0].number;
-        expr->expr.constant.unit = unit_new_single(tokens.tokens[1].unit_type, 1, arena);
-        debug("constant with unit\n");
-         return expr;
-     }
-    // TODO: parse composite units
-
-    // Anything remaining should be a binary expression or a negation.
 
     // Find highest precedence, then last instance if left associative,
     // otherwise the first instance.
@@ -157,18 +151,21 @@ Expression *parse(TokenString tokens, Arena *arena) {
     for (int i = 0; i < tokens.length; i++) {
         TokenType prev_token = i == 0 ? TOK_WHITESPACE : tokens.tokens[i - 1].type;
         TokenType prev_best_token = op_index == 0 ? TOK_WHITESPACE : tokens.tokens[op_index - 1].type;
-        int curr_precedence = precedence(tokens.tokens[i].type, prev_token);
-        int best_precedence = precedence(tokens.tokens[op_index].type, prev_best_token);
-        bool curr_left_assoc = left_associative(tokens.tokens[i].type, prev_token);
+        int curr_precedence = precedence(tokens.tokens[i].type, prev_token, i);
+        int best_precedence = precedence(tokens.tokens[op_index].type, prev_best_token, op_index);
+        bool curr_left_assoc = left_associative(tokens.tokens[i].type, prev_token, i);
         if (curr_precedence > best_precedence || (curr_precedence == best_precedence && curr_left_assoc)) {
+            debug("Found higher precedence: %d at index: %d\n", tokens.tokens[i].type, i);
             op_index = i;
         }
     }
     TokenType op = tokens.tokens[op_index].type;
+    // Maybe don't even need this check?
     if (is_bin_op(op) && ((op_index == 0 && op != TOK_SUB) || op_index == tokens.length - 1)) {
         debug("Binop at beginning or end: tokens.length: %zu op_index: %d op: %d\n", tokens.length, op_index, op);
         return NULL;
     }
+    debug("Found token: %d at index: %d\n", op, op_index);
     Expression *expr = arena_alloc(arena, sizeof(Expression));
     if (op == TOK_ADD) {
         expr->type = EXPR_ADD;
@@ -179,6 +176,10 @@ Expression *parse(TokenString tokens, Arena *arena) {
     } else if (op == TOK_DIV) {
         expr->type = EXPR_DIV;
     } else if (op == TOK_CARET) {
+        expr->type = EXPR_UNIT;
+    } else if (op == TOK_UNIT) {
+        expr->type = EXPR_UNIT;
+    } else if (op == TOK_NUM) {
         expr->type = EXPR_CONSTANT;
     } else {
         expr->type = EXPR_CONVERT;
@@ -196,6 +197,44 @@ Expression *parse(TokenString tokens, Arena *arena) {
         return right;
     }
 
+    if (op == TOK_UNIT) {
+        // TODO: somehow simplify this into the binary expression stuff? maybe like
+        // the caret case as well
+        TokenString left_tokens = { .tokens = tokens.tokens, .length = op_index };
+        Expression *left = parse(left_tokens, arena);
+        if (left == NULL || left->type == EXPR_EMPTY || left->type == EXPR_QUIT) {
+            return left;
+        }
+        if (left->type != EXPR_UNIT) {
+            debug("expected unit before unit\n");
+            return NULL;
+        }
+        TokenString right_tokens = { .tokens = tokens.tokens + op_index, .length = tokens.length - op_index };
+        Expression *right = parse(right_tokens, arena);
+        if (right == NULL || right->type == EXPR_EMPTY || right->type == EXPR_QUIT) {
+            return right;
+        }
+        if (right->type != EXPR_UNIT) {
+            debug("expected unit after unit\n");
+            return NULL;
+        }
+        expr->expr.unit = unit_combine(left->expr.unit, right->expr.unit, arena);
+        return expr;
+    }
+
+    if (op == TOK_NUM) {
+        TokenString right_tokens = { .tokens = tokens.tokens + op_index + 1, .length = tokens.length - op_index - 1 };
+        Expression *right = parse(right_tokens, arena);
+        if (right == NULL || (right->type != EXPR_UNIT && right->type != EXPR_EMPTY)) {
+            debug("expected unit after number\n");
+            return NULL;
+        }
+        expr->expr.constant.unit = right->type == EXPR_EMPTY ? unit_new_none(arena) : right->expr.unit;
+        expr->expr.constant.value = tokens.tokens[op_index].number;
+        debug("number with unit\n");
+        return expr;
+    }
+
     TokenString left_tokens = { .tokens = tokens.tokens, .length = op_index };
     Expression *left = parse(left_tokens, arena);
     if (left == NULL || left->type == EXPR_EMPTY || left->type == EXPR_QUIT) {
@@ -209,22 +248,21 @@ Expression *parse(TokenString tokens, Arena *arena) {
 
     // Maybe not necessary, but we simplify the unit here...?
     // We could just reject wrong expression types and use a binary expression...TODO
-    if (expr->type == EXPR_CONSTANT) {
-        if (left->type != EXPR_CONSTANT || right->type != EXPR_CONSTANT) {
-            debug("Trying to apply degree to non-unit or non-constant\n");
+    if (op == TOK_CARET) {
+        if (left->type != EXPR_UNIT || right->type != EXPR_CONSTANT) {
+            debug("Trying to apply degree to non-unit, or degree is non-constant\n");
             return NULL;
         }
-        if (left->expr.constant.unit.length != 1 || left->expr.constant.unit.degrees[0] != 1) {
-            debug("Can't parse composite units, only can apply caret to single units with no degrees\n");
+        if (left->expr.unit.length != 1 || left->expr.unit.degrees[0] != 1) {
+            debug("Can only can apply caret to single units with no degrees\n");
             return NULL;
         }
         if (!is_unit_none(right->expr.constant.unit) && !is_unit_unknown(right->expr.constant.unit)) {
             debug("Degree somehow has a unit\n");
             return NULL;
         }
-        expr->expr.constant.value = left->expr.constant.value;
-        expr->expr.constant.unit = unit_new_single(left->expr.constant.unit.types[0], right->expr.constant.value, arena);
-        debug("unit with degree: unit: %s, degree: %f\n", display_unit(left->expr.constant.unit, arena), right->expr.constant.value);
+        expr->expr.unit = unit_new_single(left->expr.unit.types[0], right->expr.constant.value, arena);
+        debug("unit with degree: unit: %s\n", display_unit(expr->expr.unit, arena));
         return expr;
     }
 
