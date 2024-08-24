@@ -70,11 +70,18 @@ Expression *expr_new_bin(ExprType type, Expression *left, Expression *right, Are
     return expr;
 }
 
+bool is_bin_op(TokenType type) {
+    return type == TOK_ADD || type == TOK_SUB || type == TOK_MUL ||
+            type == TOK_DIV || type == TOK_CONVERT;
+    // TODO: caret
+}
+
 // Precedence - lower number means this should be evaluated first
-int precedence(TokenType op) {
-    if (op == TOK_MUL || op == TOK_DIV) return 1;
-    if (op == TOK_ADD || op == TOK_SUB) return 2;
-    if (op == TOK_CONVERT) return 3;
+int precedence(TokenType op, TokenType prev_token) {
+    if (op == TOK_SUB && is_bin_op(prev_token)) return 1;
+    if (op == TOK_MUL || op == TOK_DIV) return 2;
+    if (op == TOK_ADD || op == TOK_SUB) return 3;
+    if (op == TOK_CONVERT) return 4;
     return 0; // error case, shouldn't matter
 }
 
@@ -124,6 +131,15 @@ Expression *parse(TokenString tokens, Arena *arena) {
         debug("constant with unit\n");
         return expr;
     }
+    if (tokens.tokens[0].type == TOK_SUB) {
+        TokenString right_tokens = { .tokens = tokens.tokens + 1, .length = tokens.length - 1 };
+        Expression *right = parse(right_tokens, arena);
+        if (right == NULL || right->type != EXPR_CONSTANT) {
+            return NULL;
+        }
+        right->expr.constant.value *= -1;
+        return right;
+    }
     // TODO: parse composite units
 
     // Anything remaining should be a binary expression.
@@ -134,17 +150,19 @@ Expression *parse(TokenString tokens, Arena *arena) {
     // that will be evaluated last.
     size_t op_index = 0;
     for (int i = 0; i < tokens.length; i++) {
-        int curr_precedence = precedence(tokens.tokens[i].type);
-        int best_precedence = precedence(tokens.tokens[op_index].type);
+        TokenType prev_token = i == 0 ? TOK_WHITESPACE : tokens.tokens[i - 1].type;
+        TokenType prev_best_token = op_index == 0 ? TOK_WHITESPACE : tokens.tokens[op_index - 1].type;
+        int curr_precedence = precedence(tokens.tokens[i].type, prev_token);
+        int best_precedence = precedence(tokens.tokens[op_index].type, prev_best_token);
         if (curr_precedence >= best_precedence) {
             op_index = i;
         }
     }
+    TokenType op = tokens.tokens[op_index].type;
     if (op_index == 0 || op_index == tokens.length - 1) {
         return NULL;
     }
     Expression *expr = arena_alloc(arena, sizeof(Expression));
-    TokenType op = tokens.tokens[op_index].type;
     if (op == TOK_ADD) {
         expr->type = EXPR_ADD;
     } else if (op == TOK_SUB) {
@@ -153,7 +171,7 @@ Expression *parse(TokenString tokens, Arena *arena) {
         expr->type = EXPR_MUL;
     } else if (op == TOK_DIV) {
         expr->type = EXPR_DIV;
-    } else if (op == TOK_CONVERT) {
+    } else {
         expr->type = EXPR_CONVERT;
     }
 
