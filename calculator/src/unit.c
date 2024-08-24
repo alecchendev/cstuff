@@ -93,6 +93,7 @@ double unit_convert_through(UnitType a, UnitType b, UnitType c) {
     return unit_convert(a, c) * unit_convert(c, b);
 }
 
+// TODO: just convert this into a simple table
 double unit_convert(UnitType a, UnitType b) {
     if (a == b) return 1;
     // Everything is defined big -> small, otherwise reuse other conversions

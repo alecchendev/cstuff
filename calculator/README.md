@@ -48,7 +48,10 @@ To do:
     - [x] Have a set of builtin units with conversion rates out of the box
 - [ ] Composite units
     - [x] Check/build composite units
+    - [x] Handle negation
     - [ ] Tokenize + parse composite units
+        - [x] Degrees of individual units
+        - [ ] Multiple units
     - [ ] Handle composite conversions
 - [ ] Handle performing operations on the last result (expression starts with operation)
 - [ ] Let user define stuff
@@ -58,4 +61,6 @@ To do:
     - [ ] Handle custom conversions
 - [ ] Display current memory in repl (variables, custom unit definitions)
 - [ ] Compile to webassembly and make a basic webapp (no backend, obviously)
+    - [ ] Add autocomplete for builtin units when typing
+    - [ ] Syntax highlightning? maybe need to tokenize/parse along the way..?
 

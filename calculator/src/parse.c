@@ -72,20 +72,34 @@ Expression *expr_new_bin(ExprType type, Expression *left, Expression *right, Are
 
 bool is_bin_op(TokenType type) {
     return type == TOK_ADD || type == TOK_SUB || type == TOK_MUL ||
-            type == TOK_DIV || type == TOK_CONVERT;
-    // TODO: caret
+            type == TOK_DIV || type == TOK_CARET || type == TOK_CONVERT;
 }
 
 // Precedence - lower number means this should be evaluated first
 int precedence(TokenType op, TokenType prev_token) {
-    if (op == TOK_SUB && is_bin_op(prev_token)) return 1;
-    if (op == TOK_MUL || op == TOK_DIV) return 2;
-    if (op == TOK_ADD || op == TOK_SUB) return 3;
-    if (op == TOK_CONVERT) return 4;
+    if (op == TOK_SUB && (is_bin_op(prev_token) || prev_token == TOK_WHITESPACE)) return 1;
+    if (op == TOK_CARET) return 2;
+    if (op == TOK_MUL || op == TOK_DIV) return 3;
+    if (op == TOK_ADD || op == TOK_SUB) return 4;
+    if (op == TOK_CONVERT) return 5;
     return 0; // error case, shouldn't matter
 }
 
+// True means take the last instance when evaluating equal precedence
+bool left_associative(TokenType op, TokenType prev_token) {
+    if (op == TOK_SUB && (is_bin_op(prev_token) || prev_token == TOK_WHITESPACE)) return false;
+    if (op == TOK_CARET) return true; // Doesn't apply yet
+    if (op == TOK_MUL || op == TOK_DIV) return true;
+    if (op == TOK_ADD || op == TOK_SUB) return true;
+    if (op == TOK_CONVERT) return true; // Doesn't apply
+    return false; // error case, shouldn't matter
+}
+
 Expression *parse(TokenString tokens, Arena *arena) {
+    debug("Parsing expression\n");
+    for (size_t i = 0; i < tokens.length; i++) {
+        token_display(tokens.tokens[i]);
+    }
     if (tokens.length == 0 || (tokens.length == 1 && tokens.tokens[0].type == TOK_END)) {
         Expression *expr = arena_alloc(arena, sizeof(Expression));
         *expr = (Expression) { .type = EXPR_EMPTY };
@@ -106,7 +120,6 @@ Expression *parse(TokenString tokens, Arena *arena) {
         debug("constant\n");
         return expr;
     }
-    // TODO: parsing composite units
     if (tokens.length == 1 && tokens.tokens[0].type == TOK_UNIT) {
         Expression *expr = arena_alloc(arena, sizeof(Expression));
         expr->type = EXPR_UNIT;
@@ -118,7 +131,7 @@ Expression *parse(TokenString tokens, Arena *arena) {
         debug("Invalid expression token length 1\n");
         return NULL;
     }
-    if (tokens.length > 1 && tokens.tokens[tokens.length - 1].type == TOK_END) {
+    if (tokens.tokens[tokens.length - 1].type == TOK_END) {
         debug("Parsing end token\n");
         return parse((TokenString) { .tokens = tokens.tokens, .length = tokens.length - 1 }, arena);
     }
@@ -129,37 +142,31 @@ Expression *parse(TokenString tokens, Arena *arena) {
         expr->expr.constant.value = tokens.tokens[0].number;
         expr->expr.constant.unit = unit_new_single(tokens.tokens[1].unit_type, 1, arena);
         debug("constant with unit\n");
-        return expr;
-    }
-    if (tokens.tokens[0].type == TOK_SUB) {
-        TokenString right_tokens = { .tokens = tokens.tokens + 1, .length = tokens.length - 1 };
-        Expression *right = parse(right_tokens, arena);
-        if (right == NULL || right->type != EXPR_CONSTANT) {
-            return NULL;
-        }
-        right->expr.constant.value *= -1;
-        return right;
-    }
+         return expr;
+     }
     // TODO: parse composite units
 
-    // Anything remaining should be a binary expression.
+    // Anything remaining should be a binary expression or a negation.
 
-    // Find last case of highest precedence.
+    // Find highest precedence, then last instance if left associative,
+    // otherwise the first instance.
     // When we evaluate, we evaluate the leaves first, so
     // when we're creating the root here, we want the thing
     // that will be evaluated last.
-    size_t op_index = 0;
+    int op_index = 0;
     for (int i = 0; i < tokens.length; i++) {
         TokenType prev_token = i == 0 ? TOK_WHITESPACE : tokens.tokens[i - 1].type;
         TokenType prev_best_token = op_index == 0 ? TOK_WHITESPACE : tokens.tokens[op_index - 1].type;
         int curr_precedence = precedence(tokens.tokens[i].type, prev_token);
         int best_precedence = precedence(tokens.tokens[op_index].type, prev_best_token);
-        if (curr_precedence >= best_precedence) {
+        bool curr_left_assoc = left_associative(tokens.tokens[i].type, prev_token);
+        if (curr_precedence > best_precedence || (curr_precedence == best_precedence && curr_left_assoc)) {
             op_index = i;
         }
     }
     TokenType op = tokens.tokens[op_index].type;
-    if (op_index == 0 || op_index == tokens.length - 1) {
+    if (is_bin_op(op) && ((op_index == 0 && op != TOK_SUB) || op_index == tokens.length - 1)) {
+        debug("Binop at beginning or end: tokens.length: %zu op_index: %d op: %d\n", tokens.length, op_index, op);
         return NULL;
     }
     Expression *expr = arena_alloc(arena, sizeof(Expression));
@@ -171,8 +178,22 @@ Expression *parse(TokenString tokens, Arena *arena) {
         expr->type = EXPR_MUL;
     } else if (op == TOK_DIV) {
         expr->type = EXPR_DIV;
+    } else if (op == TOK_CARET) {
+        expr->type = EXPR_CONSTANT;
     } else {
         expr->type = EXPR_CONVERT;
+    }
+
+    if (op == TOK_SUB && op_index == 0) {
+        TokenString right_tokens = { .tokens = tokens.tokens + 1, .length = tokens.length - 1 };
+        Expression *right = parse(right_tokens, arena);
+        if (right == NULL || right->type != EXPR_CONSTANT) {
+            debug("expected constant after negation\n");
+            return NULL;
+        }
+        right->expr.constant.value *= -1;
+        debug("negated constant\n");
+        return right;
     }
 
     TokenString left_tokens = { .tokens = tokens.tokens, .length = op_index };
@@ -180,18 +201,39 @@ Expression *parse(TokenString tokens, Arena *arena) {
     if (left == NULL || left->type == EXPR_EMPTY || left->type == EXPR_QUIT) {
         return left;
     }
-    expr->expr.binary_expr.left = left;
-
     TokenString right_tokens = { .tokens = tokens.tokens + op_index + 1, .length = tokens.length - op_index - 1 };
     Expression *right = parse(right_tokens, arena);
     if (right == NULL || right->type == EXPR_EMPTY || right->type == EXPR_QUIT) {
         return right;
     }
-    expr->expr.binary_expr.right = right;
+
+    // Maybe not necessary, but we simplify the unit here...?
+    // We could just reject wrong expression types and use a binary expression...TODO
+    if (expr->type == EXPR_CONSTANT) {
+        if (left->type != EXPR_CONSTANT || right->type != EXPR_CONSTANT) {
+            debug("Trying to apply degree to non-unit or non-constant\n");
+            return NULL;
+        }
+        if (left->expr.constant.unit.length != 1 || left->expr.constant.unit.degrees[0] != 1) {
+            debug("Can't parse composite units, only can apply caret to single units with no degrees\n");
+            return NULL;
+        }
+        if (!is_unit_none(right->expr.constant.unit) && !is_unit_unknown(right->expr.constant.unit)) {
+            debug("Degree somehow has a unit\n");
+            return NULL;
+        }
+        expr->expr.constant.value = left->expr.constant.value;
+        expr->expr.constant.unit = unit_new_single(left->expr.constant.unit.types[0], right->expr.constant.value, arena);
+        debug("unit with degree: unit: %s, degree: %f\n", display_unit(left->expr.constant.unit, arena), right->expr.constant.value);
+        return expr;
+    }
 
     if (expr->type == EXPR_CONVERT && right->type != EXPR_UNIT) {
         return NULL;
     }
+
+    expr->expr.binary_expr.left = left;
+    expr->expr.binary_expr.right = right;
 
     return expr;
 }

@@ -17,6 +17,7 @@ enum TokenType {
     TOK_SUB,
     TOK_MUL,
     TOK_DIV,
+    TOK_CARET,
     TOK_WHITESPACE,
     TOK_QUIT,
     TOK_END,
@@ -61,6 +62,7 @@ const Token add_token = {TOK_ADD};
 const Token sub_token = {TOK_SUB};
 const Token mul_token = {TOK_MUL};
 const Token div_token = {TOK_DIV};
+const Token caret_token = {TOK_CARET};
 const Token convert_token = {TOK_CONVERT};
 
 Token token_new_num(double num) {
@@ -110,7 +112,7 @@ Token next_token(const char *input, size_t *pos, size_t length) {
         return whitespace_token;
     }
 
-    const unsigned char operators[] = {'+', '-', '*', '/'};
+    const unsigned char operators[] = {'+', '-', '*', '/', '^'};
     if (char_in_set(input[*pos], operators)) {
         Token token = invalid_token;
         if (input[*pos] == '+') {
@@ -125,8 +127,10 @@ Token next_token(const char *input, size_t *pos, size_t length) {
             }
         } else if (input[*pos] == '*') {
             token = mul_token;
-        } else {
+        } else if (input[*pos] == '/') {
             token = div_token;
+        } else {
+            token = (Token){TOK_CARET};
         }
         (*pos)++;
         return token;
@@ -231,6 +235,9 @@ void token_display(Token token) {
             break;
         case TOK_CONVERT:
             debug("Convert token\n");
+            break;
+        case TOK_CARET:
+            debug("Caret token\n");
             break;
         default:
             debug("Unknown token\n");

@@ -123,6 +123,8 @@ void test_tokenize(void *_) {
         {"4.5 - 3 km -> mi", 7, {token_new_num(4.5), sub_token, token_new_num(3),
             token_new_unit(UNIT_KILOMETER), convert_token, token_new_unit(UNIT_MILE),
             end_token}},
+        {"50km^2", 5, {token_new_num(50), token_new_unit(UNIT_KILOMETER), caret_token, token_new_num(2), end_token}},
+        {"50 km ^ 2", 5, {token_new_num(50), token_new_unit(UNIT_KILOMETER), caret_token, token_new_num(2), end_token}},
         // TODO: more comprehensive
     };
     const size_t num_cases = sizeof(cases) / sizeof(TokenCase);
@@ -174,6 +176,8 @@ void test_parse_case(void *c_opaque) {
         token_display(tokens.tokens[i]);
     }
     Expression *expr = parse(tokens, &arena);
+    assert(expr != NULL);
+    display_expr(0, *expr, &arena);
     assert(exprs_equal(*expr, *c->expected, &arena));
     arena_free(&arena);
 }
@@ -199,8 +203,31 @@ void test_parse(void *_) {
         // Negative
         {"2 * - 3", expr_new_bin(EXPR_MUL, expr_new_const(2, &case_arena),
             expr_new_const(-3, &case_arena), &case_arena)},
+        {"-2 * 3", expr_new_bin(EXPR_MUL, expr_new_const(-2, &case_arena),
+            expr_new_const(3, &case_arena), &case_arena)},
+        {"-2 cm * 3", expr_new_bin(EXPR_MUL,
+            expr_new_const_unit(-2, unit_new_single(UNIT_CENTIMETER, 1, &case_arena), &case_arena),
+            expr_new_const(3, &case_arena), &case_arena)},
         {"- 2", expr_new_const(-2, &case_arena)},
+        {"1 - - 2", expr_new_bin(EXPR_SUB, expr_new_const(1, &case_arena),
+            expr_new_const(-2, &case_arena), &case_arena)},
+        {"1 - - - 2", expr_new_bin(EXPR_SUB, expr_new_const(1, &case_arena),
+            expr_new_const(2, &case_arena), &case_arena)},
+        {"1 - - - - 2", expr_new_bin(EXPR_SUB, expr_new_const(1, &case_arena),
+            expr_new_const(-2, &case_arena), &case_arena)},
+        // Composite units
+        {"50 km^2", expr_new_const_unit(50, unit_new_single(UNIT_KILOMETER, 2, &case_arena), &case_arena)},
+        {"50 km ^ 2", expr_new_const_unit(50, unit_new_single(UNIT_KILOMETER, 2, &case_arena), &case_arena)},
+        {"50 km^-2", expr_new_const_unit(50, unit_new_single(UNIT_KILOMETER, -2, &case_arena), &case_arena)},
+        {"50 km^ - 2", expr_new_const_unit(50, unit_new_single(UNIT_KILOMETER, -2, &case_arena), &case_arena)},
+        {"- 50 km ^ -2", expr_new_const_unit(-50, unit_new_single(UNIT_KILOMETER, -2, &case_arena), &case_arena)},
+        {"- 50 km ^ -2 - 3", expr_new_bin(EXPR_SUB,
+            expr_new_const_unit(50, unit_new_single(UNIT_KILOMETER, -2, &case_arena), &case_arena),
+            expr_new_const(3, &case_arena), &case_arena)},
         // TODO: invalid expression
+        /*{"50 km ^ -2 ^ 3"}*/
+        /*{"50 km ^ -2 km"}*/
+        /*{"1 +"},*/
     };
     const size_t num_cases = sizeof(cases) / sizeof(ParseCase);
     bool all_passed = true;
