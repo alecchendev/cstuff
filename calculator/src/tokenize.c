@@ -12,6 +12,7 @@ typedef enum TokenType TokenType;
 enum TokenType {
     TOK_NUM,
     TOK_UNIT,
+    TOK_CONVERT,
     TOK_ADD,
     TOK_SUB,
     TOK_MUL,
@@ -60,6 +61,7 @@ const Token add_token = {TOK_ADD};
 const Token sub_token = {TOK_SUB};
 const Token mul_token = {TOK_MUL};
 const Token div_token = {TOK_DIV};
+const Token convert_token = {TOK_CONVERT};
 
 Token token_new_num(double num) {
     return (Token){TOK_NUM, .number = num };
@@ -115,6 +117,12 @@ Token next_token(const char *input, size_t *pos, size_t length) {
             token = add_token;
         } else if (input[*pos] == '-') {
             token = sub_token;
+            (*pos)++;
+            if (input[*pos] == '>') {
+                token = convert_token;
+            } else {
+                (*pos)--;
+            }
         } else if (input[*pos] == '*') {
             token = mul_token;
         } else {
@@ -220,6 +228,9 @@ void token_display(Token token) {
             break;
         case TOK_UNIT:
             debug("Unit token: %s\n", unit_strings[token.unit_type]);
+            break;
+        case TOK_CONVERT:
+            debug("Convert token\n");
             break;
         default:
             debug("Unknown token\n");

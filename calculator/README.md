@@ -45,11 +45,17 @@ To do:
 - [ ] Address every TODO in the code
 - [x] Handle units and conversions
     - [x] Basic rejection of incompatible units
-    - [ ] Have a set of builtin units with conversion rates out of the box
-    - [ ] Handle custom units?
+    - [x] Have a set of builtin units with conversion rates out of the box
+- [ ] Composite units
     - [x] Check/build composite units
     - [ ] Tokenize + parse composite units
-- [ ] Handle basic variables
-- [ ] Handle basic scripts
+    - [ ] Handle composite conversions
+- [ ] Handle performing operations on the last result (expression starts with operation)
+- [ ] Let user define stuff
+    - [ ] Handle basic variables
+    - [ ] Handle basic scripts
+    - [ ] Handle custom units
+    - [ ] Handle custom conversions
+- [ ] Display current memory in repl (variables, custom unit definitions)
 - [ ] Compile to webassembly and make a basic webapp (no backend, obviously)
 

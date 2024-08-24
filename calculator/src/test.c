@@ -51,6 +51,10 @@ struct TokenCase {
     const Token expected[MAX_INPUT];
 };
 
+bool eq_diff(double a, double b) {
+    return a - b < 0.0000001;
+}
+
 bool tokens_equal(Token a, Token b) {
     if (a.type != b.type) {
         printf("Expected type %d, got %d\n", b.type, a.type);
@@ -63,7 +67,7 @@ bool tokens_equal(Token a, Token b) {
         printf("Expected unit type %s, got %s\n", unit_strings[b.unit_type], unit_strings[a.unit_type]);
         return false;
     }
-    if (a.type == TOK_NUM && a.number - b.number > 0.0000001) {
+    if (a.type == TOK_NUM && !eq_diff(a.number, b.number)) {
         printf("Expected number %f, got %f\n", b.number, a.number);
         return false;
     }
@@ -115,6 +119,10 @@ void test_tokenize(void *_) {
             token_new_num(1), token_new_unit(UNIT_MILE), div_token,
             token_new_unit(UNIT_HOUR), end_token
         }},
+        {"->", 2, {convert_token, end_token}},
+        {"4.5 - 3 km -> mi", 7, {token_new_num(4.5), sub_token, token_new_num(3),
+            token_new_unit(UNIT_KILOMETER), convert_token, token_new_unit(UNIT_MILE),
+            end_token}},
         // TODO: more comprehensive
     };
     const size_t num_cases = sizeof(cases) / sizeof(TokenCase);
@@ -172,8 +180,6 @@ void test_parse_case(void *c_opaque) {
 
 void test_parse(void *_) {
     Arena case_arena = arena_create();
-    UnitType mi_h[] = {UNIT_MILE, UNIT_HOUR};
-    int mi_h_degrees[] = {1, -1};
     const ParseCase cases[] = {
         {"1 + 2 * 3", expr_new_bin(EXPR_ADD,
             expr_new_const(1, &case_arena),
@@ -229,7 +235,11 @@ void test_check_unit(void *_) {
         {"1 km * 2 mi * 3 h", unit_new((UnitType[]){UNIT_KILOMETER, UNIT_MILE, UNIT_HOUR}, (int[]){1, 1, 1}, 3, &case_arena)},
         {"1km*2mi*3h*4km*5mi*2s", unit_new((UnitType[]){UNIT_KILOMETER, UNIT_MILE, UNIT_HOUR, UNIT_SECOND}, (int[]){2, 2, 1, 1}, 4, &case_arena)},
         {"1km*2mi*3h*4km*5mi*2s+3km", unit_new_unknown(&case_arena)},
-        {"1km*2mi/4km", unit_new((UnitType[]){UNIT_MILE}, (int[]){1}, 1, &case_arena)}
+        {"1km*2mi/4km", unit_new((UnitType[]){UNIT_MILE}, (int[]){1}, 1, &case_arena)},
+        {"1km -> mi", unit_new_single(UNIT_MILE, 1, &case_arena)},
+        {"1km -> s", unit_new_unknown(&case_arena)},
+        {"1kg -> h", unit_new_unknown(&case_arena)},
+        {"1 lb -> in", unit_new_unknown(&case_arena)},
     };
     const size_t num_cases = sizeof(cases) / sizeof(CheckUnitCase);
     bool all_passed = true;
@@ -252,8 +262,9 @@ void test_evaluate_case(void *c_opaque) {
     TokenString tokens = tokenize(c->input, &arena);
     Expression *expr = parse(tokens, &arena);
     assert(expr != NULL);
-    double result = evaluate(*expr);
-    assert_eq(result, c->expected);
+    double result = evaluate(*expr, &arena);
+    debug("Expected: %f, got: %f\n", c->expected, result);
+    assert(eq_diff(result, c->expected));
     arena_free(&arena);
 }
 
@@ -272,6 +283,9 @@ void test_evaluate(void *_) {
         {" 3000  - 600 * 20 / 2.5 +\t20", -1780},
         // Units
         {"2 cm * 3 + 1.5cm", 7.5},
+        // Conversions
+        {"1 km * 3 -> in", 118110.236400},
+        {"2 s * 3 h / 2 s -> min", 180},
         // TODO: overflow tests
     };
     const size_t num_cases = sizeof(cases) / sizeof(EvaluateCase);
@@ -291,7 +305,7 @@ typedef struct {
 void test_display_unit(void *_) {
     Arena arena = arena_create();
     DisplayUnitCase cases[] = {
-        {unit_new_none(&arena), ""},
+        {unit_new_none(&arena), "none"},
         {unit_new_single(UNIT_MINUTE, 1, &arena), "min"},
         {unit_new_single(UNIT_CENTIMETER, 2, &arena), "cm^2"},
         {unit_new_single(UNIT_KILOGRAM, -2, &arena), "kg^-2"},
