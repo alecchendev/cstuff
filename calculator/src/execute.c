@@ -16,14 +16,14 @@ bool execute_line(const char *input) {
     } else if (expr->type == EXPR_EMPTY) {
         // no op
     } else if (expr->type == EXPR_QUIT) {
-        // is this a case?
         return true;
-    }
-    display_expr(0, *expr, &arena);
-    Unit unit = check_unit(*expr, &arena);
-    if (!is_unit_unknown(unit)) {
-        double result = evaluate(*expr);
-        printf("%f %s\n", result, display_unit(unit, &arena));
+    } else {
+        display_expr(0, *expr, &arena);
+        Unit unit = check_unit(*expr, &arena);
+        if (!is_unit_unknown(unit)) {
+            double result = evaluate(*expr);
+            printf("%f %s\n", result, display_unit(unit, &arena));
+        }
     }
     arena_free(&arena);
     return false;
