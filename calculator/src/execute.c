@@ -6,11 +6,9 @@
 #include "tokenize.c"
 #include "arena.c"
 
-const size_t MAX_MEMORY_SIZE = MAX_INPUT * sizeof(Token) + MAX_INPUT * sizeof(Expression);
-
 // TODO make this + repl more testable..?
 bool execute_line(const char *input) {
-    Arena arena = arena_create(MAX_MEMORY_SIZE);
+    Arena arena = arena_create();
     TokenString tokens = tokenize(input, &arena);
     Expression *expr = parse(tokens, &arena);
     if (expr == NULL) {
@@ -27,7 +25,7 @@ bool execute_line(const char *input) {
         double result = evaluate(*expr);
         printf("%f %s\n", result, display_unit(unit, &arena));
     }
-    arena_free(arena);
+    arena_free(&arena);
     return false;
 }
 
@@ -121,7 +119,6 @@ struct History {
 };
 
 #define MAX_HISTORY 64
-#define MAX_HISTORY_MEMORY (MAX_HISTORY * sizeof(Input))
 
 void repl(FILE *input_fd) {
     const int file_num = fileno(input_fd);
@@ -144,7 +141,7 @@ void repl(FILE *input_fd) {
         exit(1); // TODO handle differently?
     }
 
-    Arena history_arena = arena_create(MAX_HISTORY_MEMORY);
+    Arena history_arena = arena_create();
     History history = { .history = NULL, .len = 0, .pos = 0 };
     history.history = arena_alloc(&history_arena, sizeof(Input) * MAX_HISTORY);
 
@@ -213,6 +210,6 @@ void repl(FILE *input_fd) {
         }
         history.pos = history.len;
     }
-    arena_free(history_arena);
+    arena_free(&history_arena);
 }
 

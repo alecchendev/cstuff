@@ -33,7 +33,7 @@ To do:
     - [x] Hold state + redraw line for backspace
     - [x] Implement left right
     - [x] Implement history
-- [ ] Allow infinite size input and handle memory failures
+- [x] Allow infinite size input and handle memory failures
 - [x] Optimize memory a little bit
 - [ ] Handle other text editing (e.g. option/command + backspace)
 - [x] Add debug logs configurable via a flag

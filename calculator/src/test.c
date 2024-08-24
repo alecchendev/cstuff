@@ -72,7 +72,7 @@ bool tokens_equal(Token a, Token b) {
 
 void test_tokenize_case(void *c_opaque) {
     TokenCase c = *(TokenCase *)c_opaque;
-    Arena arena = arena_create(MAX_MEMORY_SIZE);
+    Arena arena = arena_create();
     TokenString tokens = tokenize(c.input, &arena);
     for (size_t i = 0; i < tokens.length; i++) {
         token_display(tokens.tokens[i]);
@@ -81,7 +81,7 @@ void test_tokenize_case(void *c_opaque) {
     for (size_t i = 0; i < tokens.length; i++) {
         assert(tokens_equal(tokens.tokens[i], c.expected[i]));
     }
-    arena_free(arena);
+    arena_free(&arena);
 }
 
 void test_tokenize(void *_) {
@@ -157,18 +157,18 @@ bool exprs_equal(Expression a, Expression b) {
 
 void test_parse_case(void *c_opaque) {
     ParseCase *c = (ParseCase *)c_opaque;
-    Arena arena = arena_create(MAX_MEMORY_SIZE);
+    Arena arena = arena_create();
     TokenString tokens = tokenize(c->input, &arena);
     for (size_t i = 0; i < tokens.length; i++) {
         token_display(tokens.tokens[i]);
     }
     Expression *expr = parse(tokens, &arena);
     assert(exprs_equal(*expr, *c->expected));
-    arena_free(arena);
+    arena_free(&arena);
 }
 
 void test_parse(void *_) {
-    Arena case_arena = arena_create(MAX_MEMORY_SIZE);
+    Arena case_arena = arena_create();
     UnitType mi_h[] = {UNIT_MILE, UNIT_HOUR};
     int mi_h_degrees[] = {1, -1};
     const ParseCase cases[] = {
@@ -196,7 +196,7 @@ void test_parse(void *_) {
                                      NULL, "Case %zu failed\n");
     }
     assert(all_passed);
-    arena_free(case_arena);
+    arena_free(&case_arena);
 }
 
 typedef struct {
@@ -206,13 +206,13 @@ typedef struct {
 
 void test_evaluate_case(void *c_opaque) {
     EvaluateCase *c = (EvaluateCase *)c_opaque;
-    Arena arena = arena_create(MAX_MEMORY_SIZE);
+    Arena arena = arena_create();
     TokenString tokens = tokenize(c->input, &arena);
     Expression *expr = parse(tokens, &arena);
     assert(expr != NULL);
     double result = evaluate(*expr);
     assert_eq(result, c->expected);
-    arena_free(arena);
+    arena_free(&arena);
 }
 
 void test_evaluate(void *_) {
@@ -247,7 +247,7 @@ typedef struct {
 } DisplayUnitCase;
 
 void test_display_unit(void *_) {
-    Arena arena = arena_create(MAX_MEMORY_SIZE);
+    Arena arena = arena_create();
     DisplayUnitCase cases[] = {
         {unit_new_none(&arena), ""},
         {unit_new_single(UNIT_MINUTE, 1, &arena), "min"},
@@ -261,7 +261,7 @@ void test_display_unit(void *_) {
         debug("Expected: %s got: %s\n", cases[i].expected, displayed);
         assert(strncmp(displayed, cases[i].expected, MAX_COMPOSITE_UNIT_STRING) == 0);
     }
-    arena_free(arena);
+    arena_free(&arena);
 }
 
 int main() {
