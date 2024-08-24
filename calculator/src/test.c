@@ -131,7 +131,7 @@ typedef struct {
     const Expression *expected;
 } ParseCase;
 
-bool exprs_equal(Expression a, Expression b) {
+bool exprs_equal(Expression a, Expression b, Arena *arena) {
     if (a.type != b.type) {
         printf("Expected type %d, got %d\n", b.type, a.type);
         return false;
@@ -142,14 +142,17 @@ bool exprs_equal(Expression a, Expression b) {
     if (a.type == EXPR_CONSTANT && a.expr.constant.value - b.expr.constant.value > 0.0000001) {
         printf("Expected number %f, got %f\n", b.expr.constant.value, a.expr.constant.value);
         return false;
+    } else if (a.type == EXPR_CONSTANT && !units_equal(a.expr.constant.unit, b.expr.constant.unit)) {
+        printf("Expected unit %s, got %s\n", display_unit(b.expr.constant.unit, arena), display_unit(a.expr.constant.unit, arena));
+        return false;
     } else if (a.type == EXPR_CONSTANT) {
         return true;
     }
     assert(a.type == EXPR_ADD || a.type == EXPR_SUB || a.type == EXPR_MUL || a.type == EXPR_DIV);
-    if (!exprs_equal(*a.expr.binary_expr.left, *b.expr.binary_expr.left)) {
+    if (!exprs_equal(*a.expr.binary_expr.left, *b.expr.binary_expr.left, arena)) {
         return false;
     }
-    if (!exprs_equal(*a.expr.binary_expr.right, *b.expr.binary_expr.right)) {
+    if (!exprs_equal(*a.expr.binary_expr.right, *b.expr.binary_expr.right, arena)) {
         return false;
     }
     return true;
@@ -163,7 +166,7 @@ void test_parse_case(void *c_opaque) {
         token_display(tokens.tokens[i]);
     }
     Expression *expr = parse(tokens, &arena);
-    assert(exprs_equal(*expr, *c->expected));
+    assert(exprs_equal(*expr, *c->expected, &arena));
     arena_free(&arena);
 }
 
@@ -193,6 +196,45 @@ void test_parse(void *_) {
     bool all_passed = true;
     for (size_t i = 0; i < num_cases; i++) {
         all_passed &= fork_test_case(i, test_parse_case, (void *)&cases[i],
+                                     NULL, "Case %zu failed\n");
+    }
+    assert(all_passed);
+    arena_free(&case_arena);
+}
+
+typedef struct {
+    const char *input;
+    const Unit expected;
+} CheckUnitCase;
+
+void test_check_unit_case(void *c_opaque) {
+    CheckUnitCase *c = (CheckUnitCase *)c_opaque;
+    Arena arena = arena_create();
+    TokenString tokens = tokenize(c->input, &arena);
+    Expression *expr = parse(tokens, &arena);
+    assert(expr != NULL);
+    Unit unit = check_unit(*expr, &arena);
+    assert(units_equal(unit, c->expected));
+    arena_free(&arena);
+}
+
+void test_check_unit(void *_) {
+    Arena case_arena = arena_create();
+    /*UnitT*/
+    const CheckUnitCase cases[] = {
+        {"79", unit_new_none(&case_arena)},
+        {"1 + 2 * 3", unit_new_none(&case_arena)},
+        {"1 km * 2 km * 3km", unit_new_single(UNIT_KILOMETER, 3, &case_arena)},
+        {"1 mi + 1h", unit_new_unknown(&case_arena)},
+        {"1 km * 2 mi * 3 h", unit_new((UnitType[]){UNIT_KILOMETER, UNIT_MILE, UNIT_HOUR}, (int[]){1, 1, 1}, 3, &case_arena)},
+        {"1km*2mi*3h*4km*5mi*2s", unit_new((UnitType[]){UNIT_KILOMETER, UNIT_MILE, UNIT_HOUR, UNIT_SECOND}, (int[]){2, 2, 1, 1}, 4, &case_arena)},
+        {"1km*2mi*3h*4km*5mi*2s+3km", unit_new_unknown(&case_arena)},
+        {"1km*2mi/4km", unit_new((UnitType[]){UNIT_MILE}, (int[]){1}, 1, &case_arena)}
+    };
+    const size_t num_cases = sizeof(cases) / sizeof(CheckUnitCase);
+    bool all_passed = true;
+    for (size_t i = 0; i < num_cases; i++) {
+        all_passed &= fork_test_case(i, test_check_unit_case, (void *)&cases[i],
                                      NULL, "Case %zu failed\n");
     }
     assert(all_passed);
@@ -268,6 +310,7 @@ int main() {
     void (*tests[])(void *) = {
         test_tokenize,
         test_parse,
+        test_check_unit,
         test_evaluate,
         test_display_unit,
     };

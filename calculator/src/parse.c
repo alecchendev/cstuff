@@ -193,28 +193,37 @@ void display_expr(size_t offset, Expression expr, Arena *arena) {
 
 Unit check_unit(Expression expr, Arena *arena) {
     if (expr.type == EXPR_CONSTANT) {
+        debug("constant unit: %s\n", display_unit(expr.expr.constant.unit, arena));
         return expr.expr.constant.unit;
     } else if (expr.type == EXPR_EMPTY || expr.type == EXPR_QUIT) {
+        debug("empty or quit, no unit\n");
         return unit_new_unknown(arena);
     }
     Unit left = check_unit(*expr.expr.binary_expr.left, arena);
     Unit right = check_unit(*expr.expr.binary_expr.right, arena);
+    debug("left: %s, right: %s\n", display_unit(left, arena), display_unit(right, arena));
     Unit unit = unit_new_unknown(arena);
     if (is_unit_none(left)) {
         unit = right;
     } else if (is_unit_none(right)) {
         unit = left;
-    } else if (units_equal(left, right)) {
-        unit = right;
     } else if (is_unit_unknown(left) || is_unit_unknown(right)) {
         // Case to make sure we don't print our error message again
         unit = unit_new_unknown(arena);
+    } else if ((expr.type == EXPR_ADD || expr.type == EXPR_SUB) && units_equal(left, right)) {
+        unit = right;
+    } else if (expr.type == EXPR_MUL) {
+        unit = unit_combine(left, right, arena);
+    } else if (expr.type == EXPR_DIV) {
+        for (size_t i = 0; i < right.length; i++) {
+            right.degrees[i] *= -1;
+        }
+        unit = unit_combine(left, right, arena);
     } else {
         printf("Units do not match: %s %c %s\n", display_unit(left, arena),
            display_expr_op(expr.type), display_unit(right, arena));
         unit = unit_new_unknown(arena);
     }
-    // TODO: implement composite units
     return unit;
 }
 

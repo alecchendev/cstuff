@@ -89,6 +89,45 @@ Unit unit_new_unknown(Arena *arena) {
     return unit_new_single(UNIT_UNKNOWN, 0, arena);
 }
 
+Unit unit_combine(Unit a, Unit b, Arena *arena) {
+    bool *a_leftover = arena_alloc(arena, a.length * sizeof(bool));
+    bool *b_leftover = arena_alloc(arena, b.length * sizeof(bool));
+    memset(a_leftover, true, a.length * sizeof(bool));
+    memset(b_leftover, true, b.length * sizeof(bool));
+    size_t length = a.length + b.length;
+    for (size_t i = 0; i < b.length; i++) {
+        for (size_t j = 0; j < a.length; j++) {
+            if (a.types[j] == b.types[i] && a.degrees[j] == -b.degrees[i]) {
+                a_leftover[j] = false;
+                b_leftover[i] = false;
+                length -= 2;
+            } else if (a.types[j] == b.types[i]) {
+                a.degrees[j] += b.degrees[i];
+                b_leftover[i] = false;
+                length -= 1;
+            }
+        }
+    }
+    UnitType *types = arena_alloc(arena, length * sizeof(UnitType));
+    int *degrees = arena_alloc(arena, length * sizeof(int));
+    size_t curr_length = 0;
+    for (size_t i = 0; i < a.length; i++) {
+        if (a_leftover[i]) {
+            types[curr_length] = a.types[i];
+            degrees[curr_length] = a.degrees[i];
+            curr_length++;
+        }
+    }
+    for (size_t i = 0; i < b.length; i++) {
+        if (b_leftover[i]) {
+            types[curr_length] = b.types[i];
+            degrees[curr_length] = b.degrees[i];
+            curr_length++;
+        }
+    }
+    return (Unit) { .types = types, .degrees = degrees, .length = length };
+}
+
 bool units_equal(Unit a, Unit b) {
     if (a.length != b.length) return false;
     for (size_t i = 0; i < a.length; i++) {
