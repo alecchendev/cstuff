@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include "arena.c"
-#include "execute.c"
+#include "evaluate.c"
 #include "parse.c"
 #include "tokenize.c"
 

@@ -2,6 +2,7 @@
 #include <ctype.h>
 #include <unistd.h>
 #include <termios.h>
+#include "evaluate.c"
 #include "parse.c"
 #include "tokenize.c"
 #include "arena.c"
