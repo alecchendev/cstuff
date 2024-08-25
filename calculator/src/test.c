@@ -177,6 +177,7 @@ void test_parse_case(void *c_opaque) {
     Arena arena = arena_create();
     TokenString tokens = tokenize(c->input, &arena);
     Expression *expr = parse(tokens, &arena);
+    debug("input: %s\n", c->input);
     assert(expr != NULL);
     debug("Expected:\n");
     display_expr(0, *c->expected, &arena);
@@ -189,21 +190,6 @@ void test_parse_case(void *c_opaque) {
 void test_parse(void *_) {
     Arena case_arena = arena_create();
     const ParseCase cases[] = {
-        {"1 + 2 * 3", expr_new_bin(EXPR_ADD,
-            expr_new_const(1, &case_arena),
-            expr_new_bin(EXPR_MUL,
-                expr_new_const(2, &case_arena),
-                expr_new_const(3, &case_arena),
-            &case_arena),
-        &case_arena)},
-        // I have no idea why, but there is a bug here,
-        // where the first case in this array is cursed,
-        // and fails no matter what, so I just copied
-        // the case, and run from index 1.
-        // Tried:
-        // - Passes in debugger
-        // - Fails when reordered other passing cases
-        // - Passes when I comment out other tests
         {"1 + 2 * 3", expr_new_bin(EXPR_ADD,
             expr_new_const(1, &case_arena),
             expr_new_bin(EXPR_MUL,
@@ -262,6 +248,7 @@ void test_parse(void *_) {
             &case_arena),
             expr_new_const_unit(7, unit_new_single(UNIT_OUNCE, -8, &case_arena), &case_arena),
         &case_arena)}
+        // "5 s^-2 km^3 cm^4 oz^5 lb * s^2 / km ^3"
         // TODO: invalid expression
         /*{"50 km ^ -2 ^ 3"}*/
         /*{"50 km ^ -2 km"}*/
@@ -269,7 +256,7 @@ void test_parse(void *_) {
     };
     const size_t num_cases = sizeof(cases) / sizeof(ParseCase);
     bool all_passed = true;
-    for (size_t i = 1; i < num_cases; i++) {
+    for (size_t i = 0; i < num_cases; i++) {
         all_passed &= fork_test_case(i, test_parse_case, (void *)&cases[i],
                                      NULL, "Case %zu failed\n");
     }
