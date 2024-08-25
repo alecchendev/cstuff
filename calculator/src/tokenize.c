@@ -33,13 +33,13 @@ struct Token {
 
 #define MAX_INPUT 256
 
-// TODO: turn this into something simpler at comptime
-bool char_in_set(char c, const unsigned char *set) {
-    bool char_set[256] = {0};
-    for (size_t i = 0; set[i] != '\0'; i++) {
-        char_set[set[i]] = true;
+bool char_in_set(char c, const unsigned char *set, size_t set_length) {
+    for (size_t i = 0; i < set_length; i++) {
+        if (c == set[i]) {
+            return true;
+        }
     }
-    return char_set[(int)c];
+    return false;
 }
 
 bool is_digit(char c) {
@@ -76,13 +76,16 @@ Token token_new_unit(UnitType unit) {
 // TODO: make this more generic where I can simply define
 // basically a table of strings and their corresponding tokens
 Token next_token(const char *input, size_t *pos, size_t length) {
-    const unsigned char end[] = {'\0', '\n'};
-    if (*pos >= length || char_in_set(input[*pos], end)) {
+    const unsigned char end[2] = {'\0', '\n'};
+    if (*pos >= length || char_in_set(input[*pos], end, 2)) {
+        debug("Invalid end of input, next: %c\n", input[*pos+1]);
         if (*pos != length) return invalid_token;
+        debug("End of input, next: %c\n", input[*pos+1]);
         return end_token;
     }
 
     if (is_letter(input[*pos])) {
+        debug("Letter: %c, next: %c\n", input[*pos], input[*pos+1]);
         char string_token[MAX_INPUT] = {0};
         for (size_t i = 0; is_letter(input[*pos]); i++) {
             string_token[i] = input[*pos];
@@ -104,16 +107,18 @@ Token next_token(const char *input, size_t *pos, size_t length) {
         return invalid_token;
     }
 
-    const unsigned char whitespace[] = {' ', '\t'};
-    if (char_in_set(input[*pos], whitespace)) {
-        while (char_in_set(input[*pos], whitespace)) {
+    const unsigned char whitespace[2] = {' ', '\t'};
+    if (char_in_set(input[*pos], whitespace, 2)) {
+        debug("Whitespace, next: %c\n", input[*pos+1]);
+        while (char_in_set(input[*pos], whitespace, 2)) {
             (*pos)++;
         }
         return whitespace_token;
     }
 
-    const unsigned char operators[] = {'+', '-', '*', '/', '^'};
-    if (char_in_set(input[*pos], operators)) {
+    const unsigned char operators[5] = {'+', '-', '*', '/', '^'};
+    if (char_in_set(input[*pos], operators, 5)) {
+        debug("Operator: %c\n", input[*pos]);
         Token token = invalid_token;
         if (input[*pos] == '+') {
             token = add_token;
@@ -137,6 +142,7 @@ Token next_token(const char *input, size_t *pos, size_t length) {
     }
 
     if (is_digit(input[*pos])) {
+        debug("Number: %c\n", input[*pos]);
         double number = 0;
         while (is_digit(input[*pos])) {
             number = number * 10 + char_to_digit(input[*pos]);
