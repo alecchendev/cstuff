@@ -6,45 +6,61 @@
 #include <string.h>
 #include "log.c"
 
+typedef struct ArenaBlock ArenaBlock;
+struct ArenaBlock {
+    size_t size;
+    size_t used;
+    ArenaBlock *next;
+    unsigned char memory[];
+};
+
 // A basic arena allocator that doubles in size when it runs out of memory.
 typedef struct Arena Arena;
 struct Arena {
-    size_t size;
-    size_t used;
-    unsigned char *memory;
+    ArenaBlock *first;
 };
 
 #define DEFAULT_ARENA_SIZE 1024
 
+ArenaBlock *arena_block_create(size_t size) {
+    ArenaBlock *block = malloc(sizeof(ArenaBlock) + size);
+    block->size = size;
+    block->used = 0;
+    block->next = NULL;
+    return block;
+}
+
 Arena arena_create() {
     Arena arena;
-    arena.size = DEFAULT_ARENA_SIZE;
-    arena.used = 0;
-    arena.memory = malloc(arena.size);
+    arena.first = arena_block_create(DEFAULT_ARENA_SIZE);
     return arena;
 }
 
 void *arena_alloc(Arena *arena, size_t size) {
-    while (arena->used + size > arena->size) {
-        debug("Used: %zu, Size: %zu, Requested: %zu -> doubling arena size.\n", arena->used, arena->size, size);
-        arena->size *= 2;
-        unsigned char *new_memory = malloc(arena->size);
-        memcpy(new_memory, arena->memory, arena->used);
-        free(arena->memory);
-        arena->memory = new_memory;
+    ArenaBlock *block = arena->first;
+    ArenaBlock *prev = arena->first;
+    while (block != NULL) {
+        if (block->used + size <= block->size) {
+            void *ptr = block->memory + block->used;
+            block->used += size;
+            return ptr;
+        }
+        prev = block;
+        block = block->next;
     }
-    if (arena->memory == NULL) {
-        printf("Failed to allocate memory\n");
-        return NULL;
-    }
-    void *ptr = arena->memory + arena->used;
-    arena->used += size;
-    return ptr;
+    size_t new_size = prev->size * 2 >= size ? prev->size * 2 : size;
+    debug("Allocating new block, curr_size: %zu new_size: %zu requested: %zu\n", prev->size, new_size, size);
+    ArenaBlock *new_block = arena_block_create(new_size);
+    new_block->used += size;
+    prev->next = new_block;
+    return (void *)new_block->memory;
 }
 
 void arena_free(Arena *arena) {
-    free(arena->memory);
-    arena->size = 0;
-    arena->used = 0;
+    ArenaBlock *next;
+    for (ArenaBlock *block = arena->first; block != NULL; block = next) {
+        next = block->next;
+        free(block);
+    }
 }
 
