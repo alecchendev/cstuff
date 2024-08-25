@@ -80,12 +80,10 @@ UserInput read_user_input(FILE *input_fd) {
 
 void insert_slice(char input[MAX_INPUT], size_t input_len, size_t input_pos, char slice[MAX_INPUT], size_t slice_len) {
     if (input_pos > MAX_INPUT || input_len + slice_len > MAX_INPUT) return;
-    for (size_t i = input_len; i > input_pos; i--) {
-        input[i + slice_len] = input[i];
-    }
-    for (size_t i = 0; i < slice_len; i++) {
-        input[input_pos + i] = slice[i];
-    }
+    char temp[MAX_INPUT] = {0};
+    memcpy(temp, &input[input_pos], input_len - input_pos);
+    memcpy(&input[input_pos], slice, slice_len);
+    memcpy(&input[input_pos + slice_len], temp, input_len - input_pos);
 }
 
 void delete_slice(char input[MAX_INPUT], size_t start, size_t end) {
