@@ -10,18 +10,18 @@
 bool execute_line(const char *input) {
     Arena arena = arena_create();
     TokenString tokens = tokenize(input, &arena);
-    Expression *expr = parse(tokens, &arena);
-    if (expr == NULL) {
+    Expression expr = parse(tokens, &arena);
+    display_expr(0, expr, &arena);
+    if (!check_valid_expr(expr)) {
         printf("Invalid expression\n");
-    } else if (expr->type == EXPR_EMPTY) {
+    } else if (expr.type == EXPR_EMPTY) {
         // no op
-    } else if (expr->type == EXPR_QUIT) {
+    } else if (expr.type == EXPR_QUIT) {
         return true;
     } else {
-        display_expr(0, *expr, &arena);
-        Unit unit = check_unit(*expr, &arena);
+        Unit unit = check_unit(expr, &arena);
         if (!is_unit_unknown(unit)) {
-            double result = evaluate(*expr, &arena);
+            double result = evaluate(expr, &arena);
             printf("%f %s\n", result, display_unit(unit, &arena));
         }
     }

@@ -142,7 +142,7 @@ void test_tokenize(void *_) {
 
 typedef struct {
     const char *input;
-    const Expression *expected;
+    const Expression expected;
 } ParseCase;
 
 bool exprs_equal(Expression a, Expression b, Arena *arena) {
@@ -150,40 +150,48 @@ bool exprs_equal(Expression a, Expression b, Arena *arena) {
         printf("Expected type %d, got %d\n", b.type, a.type);
         return false;
     }
-    if (a.type == EXPR_EMPTY || a.type == EXPR_QUIT) {
-        return true;
+    switch (a.type) {
+        case EXPR_CONSTANT:
+            if (a.expr.constant - b.expr.constant > 0.0000001) {
+                printf("Expected number %f, got %f\n", b.expr.constant, a.expr.constant);
+                return false;
+            }
+            return true;
+        case EXPR_UNIT:
+            if (a.type == EXPR_UNIT && a.expr.unit_type != b.expr.unit_type) {
+                printf("Expected unit %s, got %s\n", unit_strings[b.expr.unit_type], unit_strings[a.expr.unit_type]);
+                return false;
+            }
+            return true;
+        case EXPR_NEG:
+            return exprs_equal(*a.expr.unary_expr.right, *b.expr.unary_expr.right, arena);
+        case EXPR_CONST_UNIT: case EXPR_COMP_UNIT:
+        case EXPR_ADD: case EXPR_SUB: case EXPR_MUL: case EXPR_DIV:
+        case EXPR_CONVERT: case EXPR_POW:
+            if (!exprs_equal(*a.expr.binary_expr.left, *b.expr.binary_expr.left, arena)) {
+                return false;
+            }
+            if (!exprs_equal(*a.expr.binary_expr.right, *b.expr.binary_expr.right, arena)) {
+                return false;
+            }
+        case EXPR_EMPTY:
+        case EXPR_QUIT:
+        case EXPR_INVALID:
+            return true;
     }
-    if (a.type == EXPR_CONSTANT && a.expr.constant.value - b.expr.constant.value > 0.0000001) {
-        printf("Expected number %f, got %f\n", b.expr.constant.value, a.expr.constant.value);
-        return false;
-    } else if (a.type == EXPR_CONSTANT && !units_equal(a.expr.constant.unit, b.expr.constant.unit)) {
-        printf("Expected unit %s, got %s\n", display_unit(b.expr.constant.unit, arena), display_unit(a.expr.constant.unit, arena));
-        return false;
-    } else if (a.type == EXPR_CONSTANT) {
-        return true;
-    }
-    assert(a.type == EXPR_ADD || a.type == EXPR_SUB || a.type == EXPR_MUL || a.type == EXPR_DIV);
-    if (!exprs_equal(*a.expr.binary_expr.left, *b.expr.binary_expr.left, arena)) {
-        return false;
-    }
-    if (!exprs_equal(*a.expr.binary_expr.right, *b.expr.binary_expr.right, arena)) {
-        return false;
-    }
-    return true;
 }
 
 void test_parse_case(void *c_opaque) {
     ParseCase *c = (ParseCase *)c_opaque;
     Arena arena = arena_create();
     TokenString tokens = tokenize(c->input, &arena);
-    Expression *expr = parse(tokens, &arena);
+    Expression expr = parse(tokens, &arena);
     debug("input: %s\n", c->input);
-    assert(expr != NULL);
     debug("Expected:\n");
-    display_expr(0, *c->expected, &arena);
+    display_expr(0, c->expected, &arena);
     debug("Got:\n");
-    display_expr(0, *expr, &arena);
-    assert(exprs_equal(*expr, *c->expected, &arena));
+    display_expr(0, expr, &arena);
+    assert(exprs_equal(expr, c->expected, &arena));
     arena_free(&arena);
 }
 
@@ -191,64 +199,84 @@ void test_parse(void *_) {
     Arena case_arena = arena_create();
     const ParseCase cases[] = {
         {"1 + 2 * 3", expr_new_bin(EXPR_ADD,
-            expr_new_const(1, &case_arena),
+            expr_new_const(1),
             expr_new_bin(EXPR_MUL,
-                expr_new_const(2, &case_arena),
-                expr_new_const(3, &case_arena),
+                expr_new_const(2),
+                expr_new_const(3),
             &case_arena),
         &case_arena)},
         {"1 cm -2kg", expr_new_bin(EXPR_SUB,
-            expr_new_const_unit(1, unit_new_single(UNIT_CENTIMETER, 1, &case_arena), &case_arena),
-            expr_new_const_unit(2, unit_new_single(UNIT_KILOGRAM, 1, &case_arena), &case_arena),
+            expr_new_const_unit(1, expr_new_unit(UNIT_CENTIMETER), &case_arena),
+            expr_new_const_unit(2, expr_new_unit(UNIT_KILOGRAM), &case_arena),
         &case_arena)},
         {"5 mi / 4 h", expr_new_bin(EXPR_DIV,
-            expr_new_const_unit(5, unit_new_single(UNIT_MILE, 1, &case_arena), &case_arena),
-            expr_new_const_unit(4, unit_new_single(UNIT_HOUR, 1, &case_arena), &case_arena),
+            expr_new_const_unit(5, expr_new_unit(UNIT_MILE), &case_arena),
+            expr_new_const_unit(4, expr_new_unit(UNIT_HOUR), &case_arena),
         &case_arena)},
         // Negative
-        {"2 * - 3", expr_new_bin(EXPR_MUL, expr_new_const(2, &case_arena),
-            expr_new_const(-3, &case_arena), &case_arena)},
-        {"-2 * 3", expr_new_bin(EXPR_MUL, expr_new_const(-2, &case_arena),
-            expr_new_const(3, &case_arena), &case_arena)},
+        {"2 * - 3", expr_new_bin(EXPR_MUL, expr_new_const(2),
+            expr_new_neg(expr_new_const(3), &case_arena), &case_arena)},
+        {"-2 * 3", expr_new_bin(EXPR_MUL, expr_new_neg(expr_new_const(2), &case_arena),
+            expr_new_const(3), &case_arena)},
         {"-2 cm * 3", expr_new_bin(EXPR_MUL,
-            expr_new_const_unit(-2, unit_new_single(UNIT_CENTIMETER, 1, &case_arena), &case_arena),
-            expr_new_const(3, &case_arena), &case_arena)},
-        {"- 2", expr_new_const(-2, &case_arena)},
-        {"1 - - 2", expr_new_bin(EXPR_SUB, expr_new_const(1, &case_arena),
-            expr_new_const(-2, &case_arena), &case_arena)},
-        {"1 - - - 2", expr_new_bin(EXPR_SUB, expr_new_const(1, &case_arena),
-            expr_new_const(2, &case_arena), &case_arena)},
-        {"1 - - - - 2", expr_new_bin(EXPR_SUB, expr_new_const(1, &case_arena),
-            expr_new_const(-2, &case_arena), &case_arena)},
+            expr_new_neg(expr_new_const_unit(2, expr_new_unit(UNIT_CENTIMETER), &case_arena), &case_arena),
+            expr_new_const(3), &case_arena)},
+        {"- 2", expr_new_neg(expr_new_const(2), &case_arena)},
+        {"1 - - 2", expr_new_bin(EXPR_SUB, expr_new_const(1),
+            expr_new_neg(expr_new_const(2), &case_arena), &case_arena)},
+        {"1 - - - 2", expr_new_bin(EXPR_SUB, expr_new_const(1),
+            expr_new_neg(expr_new_neg(expr_new_const(2), &case_arena),
+                &case_arena), &case_arena)},
+        {"1 - - - - 2", expr_new_bin(EXPR_SUB, expr_new_const(1),
+            expr_new_neg(expr_new_neg(expr_new_neg(expr_new_const(2),
+                &case_arena), &case_arena), &case_arena), &case_arena)},
+
         // Units with degrees
-        {"50 km^2", expr_new_const_unit(50, unit_new_single(UNIT_KILOMETER, 2, &case_arena), &case_arena)},
-        {"50 km ^ 2", expr_new_const_unit(50, unit_new_single(UNIT_KILOMETER, 2, &case_arena), &case_arena)},
-        {"50 km^-2", expr_new_const_unit(50, unit_new_single(UNIT_KILOMETER, -2, &case_arena), &case_arena)},
-        {"50 km^ - 2", expr_new_const_unit(50, unit_new_single(UNIT_KILOMETER, -2, &case_arena), &case_arena)},
-        {"- 50 km ^ -2", expr_new_const_unit(-50, unit_new_single(UNIT_KILOMETER, -2, &case_arena), &case_arena)},
+        {"50 km^2", expr_new_const_unit(50, expr_new_unit_degree(UNIT_KILOMETER, expr_new_const(2), &case_arena), &case_arena)},
+        {"50 km ^ 2", expr_new_const_unit(50, expr_new_unit_degree(UNIT_KILOMETER, expr_new_const(2), &case_arena), &case_arena)},
+        {"50 km^-2", expr_new_const_unit(50, expr_new_unit_degree(UNIT_KILOMETER, expr_new_neg(expr_new_const(2), &case_arena), &case_arena), &case_arena)},
+        {"50 km^ - 2", expr_new_const_unit(50, expr_new_unit_degree(UNIT_KILOMETER, expr_new_neg(expr_new_const(2), &case_arena), &case_arena), &case_arena)},
+        {"- 50 km ^ -2", expr_new_neg(expr_new_const_unit(50, expr_new_unit_degree(UNIT_KILOMETER, expr_new_neg(expr_new_const(2), &case_arena), &case_arena), &case_arena), &case_arena)},
         {"- 50 km ^ -2 - 3", expr_new_bin(EXPR_SUB,
-            expr_new_const_unit(50, unit_new_single(UNIT_KILOMETER, -2, &case_arena), &case_arena),
-            expr_new_const(3, &case_arena), &case_arena)},
+            expr_new_neg(expr_new_const_unit(
+                50, expr_new_unit_degree(UNIT_KILOMETER, expr_new_neg(expr_new_const(2), &case_arena), &case_arena),
+            &case_arena), &case_arena),
+            expr_new_const(3), &case_arena)},
+
         // Composite units
-        {"- 50 kg^2km ^-2",
-            expr_new_const_unit(-50, unit_new(
-                (UnitType[]){UNIT_KILOGRAM, UNIT_KILOMETER},
-                (int[]){2, -2}, 2, &case_arena), &case_arena)},
-        {"- 50 kg^2km ^-2 - 3", expr_new_bin(EXPR_SUB,
-            expr_new_const_unit(-50, unit_new(
-                (UnitType[]){UNIT_KILOGRAM, UNIT_KILOMETER},
-                (int[]){2, -2}, 2, &case_arena), &case_arena),
-            expr_new_const(3, &case_arena), &case_arena)},
+        {"- 50 kg^2km ^-2", expr_new_neg(expr_new_const_unit(50,
+            expr_new_unit_comp(
+                expr_new_unit_degree(UNIT_KILOGRAM, expr_new_const(2), &case_arena),
+                expr_new_unit_degree(UNIT_KILOMETER, expr_new_neg(expr_new_const(2), &case_arena), &case_arena),
+            &case_arena),
+        &case_arena), &case_arena)},
+        {"- 50 kg^2km ^-2 - 3", expr_new_bin(EXPR_SUB, expr_new_neg(expr_new_const_unit(50,
+            expr_new_unit_comp(
+                expr_new_unit_degree(UNIT_KILOGRAM, expr_new_const(2), &case_arena),
+                expr_new_unit_degree(UNIT_KILOMETER, expr_new_neg(expr_new_const(2), &case_arena), &case_arena),
+            &case_arena),
+        &case_arena), &case_arena), expr_new_const(3), &case_arena)},
         {"--1 s^-2 km ^3 cm^4 oz ^--5 * ---6lb---7oz^-8", expr_new_bin(EXPR_SUB,
             expr_new_bin(EXPR_MUL,
-                expr_new_const_unit(1, unit_new(
-                    (UnitType[]){UNIT_SECOND, UNIT_KILOMETER, UNIT_CENTIMETER, UNIT_OUNCE},
-                    (int[]){-2, 3, 4, 5}, 4, &case_arena), &case_arena),
-                expr_new_const_unit(-6, unit_new_single(UNIT_POUND, 1, &case_arena), &case_arena),
+                expr_new_neg(expr_new_neg(expr_new_const_unit(1, 
+                    expr_new_unit_comp(
+                        expr_new_unit_comp(
+                            expr_new_unit_comp(
+                                expr_new_unit_degree(UNIT_SECOND, expr_new_neg(expr_new_const(2), &case_arena), &case_arena),
+                                expr_new_unit_degree(UNIT_KILOMETER, expr_new_const(3), &case_arena),
+                            &case_arena),
+                            expr_new_unit_degree(UNIT_CENTIMETER, expr_new_const(4), &case_arena),
+                        &case_arena),
+                        expr_new_unit_degree(UNIT_OUNCE, expr_new_neg(expr_new_neg(expr_new_const(5), &case_arena), &case_arena), &case_arena),
+                    &case_arena),
+                &case_arena), &case_arena), &case_arena),
+                expr_new_neg(expr_new_neg(expr_new_neg(expr_new_const_unit(6, expr_new_unit(UNIT_POUND), &case_arena), &case_arena), &case_arena), &case_arena),
             &case_arena),
-            expr_new_const_unit(7, unit_new_single(UNIT_OUNCE, -8, &case_arena), &case_arena),
+            expr_new_neg(expr_new_neg(expr_new_const_unit(7, expr_new_unit_degree(UNIT_OUNCE, expr_new_neg(expr_new_const(8), &case_arena), &case_arena), &case_arena), &case_arena), &case_arena),
         &case_arena)}
-        // "5 s^-2 km^3 cm^4 oz^5 lb * s^2 / km ^3"
+        /*{"1 + 2km * 3 h / 2 km ^-2"}*/
+
+        // "5 s^-2 km^3 cm^4 oz^5 lb * 2 s^2 / km ^3"
         // TODO: invalid expression
         /*{"50 km ^ -2 ^ 3"}*/
         /*{"50 km ^ -2 km"}*/
@@ -273,9 +301,9 @@ void test_check_unit_case(void *c_opaque) {
     CheckUnitCase *c = (CheckUnitCase *)c_opaque;
     Arena arena = arena_create();
     TokenString tokens = tokenize(c->input, &arena);
-    Expression *expr = parse(tokens, &arena);
-    assert(expr != NULL);
-    Unit unit = check_unit(*expr, &arena);
+    Expression expr = parse(tokens, &arena);
+    assert(check_valid_expr(expr));
+    Unit unit = check_unit(expr, &arena);
     assert(units_equal(unit, c->expected));
     arena_free(&arena);
 }
@@ -316,9 +344,10 @@ void test_evaluate_case(void *c_opaque) {
     EvaluateCase *c = (EvaluateCase *)c_opaque;
     Arena arena = arena_create();
     TokenString tokens = tokenize(c->input, &arena);
-    Expression *expr = parse(tokens, &arena);
-    assert(expr != NULL);
-    double result = evaluate(*expr, &arena);
+    Expression expr = parse(tokens, &arena);
+    assert(check_valid_expr(expr));
+    assert(!is_unit_unknown(check_unit(expr, &arena)));
+    double result = evaluate(expr, &arena);
     debug("Expected: %f, got: %f\n", c->expected, result);
     assert(eq_diff(result, c->expected));
     arena_free(&arena);

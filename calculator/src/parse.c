@@ -1,9 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
-#include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
 #include "tokenize.c"
 #include "arena.c"
 #include "log.c"
@@ -11,11 +9,15 @@
 typedef struct Expression Expression;
 typedef struct Constant Constant;
 typedef struct BinaryExpr BinaryExpr;
+typedef struct UnaryExpr UnaryExpr;
 typedef struct Convert Convert;
 
 struct Constant {
     double value;
-    Unit unit;
+};
+
+struct UnaryExpr {
+    Expression *right;
 };
 
 struct BinaryExpr {
@@ -26,19 +28,25 @@ struct BinaryExpr {
 typedef enum {
     EXPR_CONSTANT,
     EXPR_UNIT,
+    EXPR_NEG,
+    EXPR_CONST_UNIT,
+    EXPR_COMP_UNIT,
     EXPR_ADD,
     EXPR_SUB,
     EXPR_MUL,
     EXPR_DIV,
     EXPR_CONVERT,
+    EXPR_POW,
     EXPR_EMPTY,
     EXPR_QUIT,
+    EXPR_INVALID,
 } ExprType;
 
 typedef union {
-    Constant constant;
+    double constant;
+    UnitType unit_type;
+    UnaryExpr unary_expr;
     BinaryExpr binary_expr;
-    Unit unit;
 } ExprData;
 
 struct Expression {
@@ -46,28 +54,38 @@ struct Expression {
     ExprData expr;
 };
 
-// These expression constructors should only be used for tests, otherwise
-// we need to make sure the pointers are valid.
-Expression *expr_new_const_unit(double value, Unit unit, Arena *arena) {
-    Expression *expr = arena_alloc(arena, sizeof(Expression));
-    *expr = (Expression) {
-        .type = EXPR_CONSTANT,
-        .expr = { .constant = { .value = value, .unit = unit } },
-    };
-    return expr;
+Expression expr_new_const(double value) {
+    return (Expression) { .type = EXPR_CONSTANT, .expr = { .constant = value }};
 }
 
-Expression *expr_new_const(double value, Arena *arena) {
-    return expr_new_const_unit(value, unit_new_none(arena), arena);
+Expression expr_new_unit(UnitType unit_type) {
+    return (Expression) { .type = EXPR_UNIT, .expr = { .unit_type = unit_type }};
 }
 
-Expression *expr_new_bin(ExprType type, Expression *left, Expression *right, Arena *arena) {
-    Expression *expr = arena_alloc(arena, sizeof(Expression));
-    *expr = (Expression) {
-        .type = type,
-        .expr = { .binary_expr = { .left = left, .right = right } },
-    };
-    return expr;
+Expression expr_new_neg(Expression right_value, Arena *arena) {
+    Expression *right = arena_alloc(arena, sizeof(Expression));
+    *right = right_value;
+    return (Expression) { .type = EXPR_NEG, .expr = { .unary_expr = { .right = right }}};
+}
+
+Expression expr_new_bin(ExprType type, Expression left_value, Expression right_value, Arena *arena) {
+    Expression *left = arena_alloc(arena, sizeof(Expression));
+    Expression *right = arena_alloc(arena, sizeof(Expression));
+    *left = left_value;
+    *right = right_value;
+    return (Expression) { .type = type, .expr = { .binary_expr = { .left = left, .right = right }}};
+}
+
+Expression expr_new_const_unit(double value, Expression unit_expr, Arena *arena) {
+    return expr_new_bin(EXPR_CONST_UNIT, expr_new_const(value), unit_expr, arena);
+}
+
+Expression expr_new_unit_degree(UnitType unit_type, Expression degree_expr, Arena *arena) {
+    return expr_new_bin(EXPR_POW, expr_new_unit(unit_type), degree_expr, arena);
+}
+
+Expression expr_new_unit_comp(Expression unit_expr_1, Expression unit_expr_2, Arena *arena) {
+    return expr_new_bin(EXPR_COMP_UNIT, unit_expr_1, unit_expr_2, arena);
 }
 
 bool is_bin_op(TokenType type) {
@@ -75,205 +93,124 @@ bool is_bin_op(TokenType type) {
             type == TOK_DIV || type == TOK_CARET || type == TOK_CONVERT;
 }
 
-// Precedence - lower number means this should be evaluated first (binds more tightly)
-int precedence(TokenType op, TokenType prev_token, size_t index) {
-    if (op == TOK_SUB && is_bin_op(prev_token)) return 1;
-    if (op == TOK_CARET) return 2;
-    if (op == TOK_UNIT && index != 0) return 3;
-    if (op == TOK_NUM && index == 0) return 4;
-    if (op == TOK_SUB && index == 0) return 5;
-    if (op == TOK_MUL || op == TOK_DIV) return 6;
-    if (op == TOK_ADD || op == TOK_SUB) return 7;
+// Higher number = parse this first, evaluate this last.
+int precedence(TokenType op, size_t idx, bool prev_is_bin_op) {
     if (op == TOK_CONVERT) return 8;
-    return 0; // error case, shouldn't matter
+    if (op == TOK_ADD) return 7;
+    if (op == TOK_SUB && idx != 0 && !prev_is_bin_op) return 7; // Not negation
+    if (op == TOK_MUL || op == TOK_DIV) return 6;
+    if (op == TOK_SUB && !prev_is_bin_op) return 5; // Normal negation
+    // This function will only be called when we are checking
+    // for tokens with length > 1, so this signals a constant
+    // with something after it.
+    if (op == TOK_NUM && idx == 0) return 4;
+    if (op == TOK_UNIT && idx != 0) return 3;
+    if (op == TOK_CARET) return 2;
+    if (op == TOK_SUB) return 1; // Negation within degree
+    return 0;
 }
 
-// True means take the last instance when evaluating equal precedence
-bool left_associative(TokenType op, TokenType prev_token, size_t index) {
-    if (op == TOK_SUB && is_bin_op(prev_token)) return false;
-    if (op == TOK_CARET) return true; // Doesn't apply yet
-    if (op == TOK_UNIT && index != 0) return true;
-    if (op == TOK_NUM && index == 0) return false;
-    if (op == TOK_SUB && index == 0) return false; // Doesn't apply
+// True = break precendence ties by taking the last instance seen
+// i.e. evaluate from left to right
+bool left_associative(TokenType op, size_t idx, bool prev_is_bin_op) {
+    if (op == TOK_ADD) return true;
+    if (op == TOK_SUB && idx != 0 && !prev_is_bin_op) return true;
     if (op == TOK_MUL || op == TOK_DIV) return true;
-    if (op == TOK_ADD || op == TOK_SUB) return true;
-    if (op == TOK_CONVERT) return true; // Doesn't apply
-    return false; // error case, shouldn't matter
+    if (op == TOK_NUM) return false;
+    if (op == TOK_UNIT && idx != 0) return true;
+    return false;
 }
 
-Expression *parse(TokenString tokens, Arena *arena) {
+const Expression empty_expr = { .type = EXPR_EMPTY };
+const Expression quit_expr = { .type = EXPR_QUIT };
+const Expression invalid_expr = { .type = EXPR_INVALID };
+
+Expression parse(TokenString tokens, Arena *arena) {
     debug("Parsing expression\n");
     for (size_t i = 0; i < tokens.length; i++) {
         token_display(tokens.tokens[i]);
     }
-    if (tokens.length == 0 || (tokens.length == 1 && tokens.tokens[0].type == TOK_END)) {
-        Expression *expr = arena_alloc(arena, sizeof(Expression));
-        *expr = (Expression) { .type = EXPR_EMPTY };
+    if (tokens.length == 0) {
         debug("empty\n");
-        return expr;
+        return empty_expr;
+    }
+    if (tokens.length > 0 && tokens.tokens[tokens.length - 1].type == TOK_END) {
+        return parse((TokenString) { .tokens = tokens.tokens, .length = tokens.length - 1}, arena);
     }
     if (tokens.length == 1 && tokens.tokens[0].type == TOK_QUIT) {
-        Expression *expr = arena_alloc(arena, sizeof(Expression));
-        *expr = (Expression) { .type = EXPR_QUIT };
         debug("quit\n");
-        return expr;
-    }
-    if (tokens.length == 1 && tokens.tokens[0].type == TOK_NUM) {
-        Expression *expr = arena_alloc(arena, sizeof(Expression));
-        expr->type = EXPR_CONSTANT;
-        expr->expr.constant.value = tokens.tokens[0].number;
-        expr->expr.constant.unit = unit_new_none(arena);
-        debug("constant\n");
-        return expr;
+        return quit_expr;
     }
     if (tokens.length == 1 && tokens.tokens[0].type == TOK_UNIT) {
-        Expression *expr = arena_alloc(arena, sizeof(Expression));
-        expr->type = EXPR_UNIT;
-        expr->expr.unit = unit_new_single(tokens.tokens[0].unit_type, 1, arena);
         debug("unit\n");
-        return expr;
+        return expr_new_unit(tokens.tokens[0].unit_type);
+    }
+    if (tokens.length == 1 && tokens.tokens[0].type == TOK_NUM) {
+        debug("constant\n");
+        return expr_new_const(tokens.tokens[0].number);
     }
     if (tokens.length == 1) {
         debug("Invalid expression token length 1\n");
-        return NULL;
-    }
-    if (tokens.tokens[tokens.length - 1].type == TOK_END) {
-        debug("Parsing end token\n");
-        return parse((TokenString) { .tokens = tokens.tokens, .length = tokens.length - 1 }, arena);
+        return invalid_expr;
     }
 
-    // Find highest precedence, then last instance if left associative,
-    // otherwise the first instance.
-    // When we evaluate, we evaluate the leaves first, so
-    // when we're creating the root here, we want the thing
-    // that will be evaluated last.
-    int op_index = 0;
-    for (int i = 0; i < tokens.length; i++) {
-        TokenType prev_token = i == 0 ? TOK_WHITESPACE : tokens.tokens[i - 1].type;
-        TokenType prev_best_token = op_index == 0 ? TOK_WHITESPACE : tokens.tokens[op_index - 1].type;
-        int curr_precedence = precedence(tokens.tokens[i].type, prev_token, i);
-        int best_precedence = precedence(tokens.tokens[op_index].type, prev_best_token, op_index);
-        bool curr_left_assoc = left_associative(tokens.tokens[i].type, prev_token, i);
+    // Find the thing we should parse next
+    size_t op_idx = 0;
+    for (size_t i = 0; i < tokens.length; i++) {
+        bool prev_is_bin_op = i == 0 ? false : is_bin_op(tokens.tokens[i - 1].type);
+        TokenType prev_best_is_bin_op = op_idx == 0 ? false : is_bin_op(tokens.tokens[op_idx - 1].type);
+        int curr_precedence = precedence(tokens.tokens[i].type, i, prev_is_bin_op);
+        int best_precedence = precedence(tokens.tokens[op_idx].type, op_idx, prev_best_is_bin_op);
+        bool curr_left_assoc = left_associative(tokens.tokens[i].type, i, prev_is_bin_op);
         if (curr_precedence > best_precedence || (curr_precedence == best_precedence && curr_left_assoc)) {
-            debug("Found higher precedence: %d at index: %d\n", tokens.tokens[i].type, i);
-            op_index = i;
+            debug("Found higher precedence: %d at idx: %zu\n", tokens.tokens[i].type, i);
+            op_idx = i;
         }
     }
-    TokenType op = tokens.tokens[op_index].type;
-    // Maybe don't even need this check?
-    if (is_bin_op(op) && ((op_index == 0 && op != TOK_SUB) || op_index == tokens.length - 1)) {
-        debug("Binop at beginning or end: tokens.length: %zu op_index: %d op: %d\n", tokens.length, op_index, op);
-        return NULL;
+    TokenType op = tokens.tokens[op_idx].type;
+
+    if (op == TOK_SUB && op_idx == 0) {
+        TokenString right_tokens = (TokenString) { .tokens = tokens.tokens + 1, .length = tokens.length - 1};
+        Expression right = parse(right_tokens, arena);
+        return expr_new_neg(right, arena);
     }
-    debug("Found token: %d at index: %d\n", op, op_index);
-    Expression *expr = arena_alloc(arena, sizeof(Expression));
-    if (op == TOK_ADD) {
-        expr->type = EXPR_ADD;
+
+    ExprType type;
+    if (op == TOK_CONVERT) {
+        type = EXPR_CONVERT;
+    } else if (op == TOK_ADD) {
+        type = EXPR_ADD;
     } else if (op == TOK_SUB) {
-        expr->type = EXPR_SUB;
+        type = EXPR_SUB;
     } else if (op == TOK_MUL) {
-        expr->type = EXPR_MUL;
+        type = EXPR_MUL;
     } else if (op == TOK_DIV) {
-        expr->type = EXPR_DIV;
-    } else if (op == TOK_CARET) {
-        expr->type = EXPR_UNIT;
-    } else if (op == TOK_UNIT) {
-        expr->type = EXPR_UNIT;
+        type = EXPR_DIV;
     } else if (op == TOK_NUM) {
-        expr->type = EXPR_CONSTANT;
+        type = EXPR_CONST_UNIT;
+    } else if (op == TOK_UNIT) {
+        type = EXPR_COMP_UNIT;
+    } else if (op == TOK_CARET) {
+        type = EXPR_POW;
     } else {
-        expr->type = EXPR_CONVERT;
+        return invalid_expr;
     }
 
-    if (op == TOK_SUB && op_index == 0) {
-        TokenString right_tokens = { .tokens = tokens.tokens + 1, .length = tokens.length - 1 };
-        Expression *right = parse(right_tokens, arena);
-        if (right == NULL || right->type != EXPR_CONSTANT) {
-            debug("expected constant after negation\n");
-            return NULL;
-        }
-        right->expr.constant.value *= -1;
-        debug("negated constant\n");
-        return right;
+    // Most binary expression omit the current token,
+    // but for some we want to keep the current token.
+    size_t left_end_idx = op_idx; // Up until (not including) here
+    size_t right_start_idx = op_idx + 1;
+    if (type == EXPR_CONST_UNIT) {
+        left_end_idx = op_idx + 1;
+    } else if (type == EXPR_COMP_UNIT) {
+        right_start_idx = op_idx;
     }
-
-    if (op == TOK_UNIT) {
-        // TODO: somehow simplify this into the binary expression stuff? maybe like
-        // the caret case as well
-        TokenString left_tokens = { .tokens = tokens.tokens, .length = op_index };
-        Expression *left = parse(left_tokens, arena);
-        if (left == NULL || left->type == EXPR_EMPTY || left->type == EXPR_QUIT) {
-            return left;
-        }
-        if (left->type != EXPR_UNIT) {
-            debug("expected unit before unit\n");
-            return NULL;
-        }
-        TokenString right_tokens = { .tokens = tokens.tokens + op_index, .length = tokens.length - op_index };
-        Expression *right = parse(right_tokens, arena);
-        if (right == NULL || right->type == EXPR_EMPTY || right->type == EXPR_QUIT) {
-            return right;
-        }
-        if (right->type != EXPR_UNIT) {
-            debug("expected unit after unit\n");
-            return NULL;
-        }
-        expr->expr.unit = unit_combine(left->expr.unit, right->expr.unit, arena);
-        return expr;
-    }
-
-    if (op == TOK_NUM) {
-        TokenString right_tokens = { .tokens = tokens.tokens + op_index + 1, .length = tokens.length - op_index - 1 };
-        Expression *right = parse(right_tokens, arena);
-        if (right == NULL || (right->type != EXPR_UNIT && right->type != EXPR_EMPTY)) {
-            debug("expected unit after number\n");
-            return NULL;
-        }
-        expr->expr.constant.unit = right->type == EXPR_EMPTY ? unit_new_none(arena) : right->expr.unit;
-        expr->expr.constant.value = tokens.tokens[op_index].number;
-        debug("number with unit\n");
-        return expr;
-    }
-
-    TokenString left_tokens = { .tokens = tokens.tokens, .length = op_index };
-    Expression *left = parse(left_tokens, arena);
-    if (left == NULL || left->type == EXPR_EMPTY || left->type == EXPR_QUIT) {
-        return left;
-    }
-    TokenString right_tokens = { .tokens = tokens.tokens + op_index + 1, .length = tokens.length - op_index - 1 };
-    Expression *right = parse(right_tokens, arena);
-    if (right == NULL || right->type == EXPR_EMPTY || right->type == EXPR_QUIT) {
-        return right;
-    }
-
-    // Maybe not necessary, but we simplify the unit here...?
-    // We could just reject wrong expression types and use a binary expression...TODO
-    if (op == TOK_CARET) {
-        if (left->type != EXPR_UNIT || right->type != EXPR_CONSTANT) {
-            debug("Trying to apply degree to non-unit, or degree is non-constant\n");
-            return NULL;
-        }
-        if (left->expr.unit.length != 1 || left->expr.unit.degrees[0] != 1) {
-            debug("Can only can apply caret to single units with no degrees\n");
-            return NULL;
-        }
-        if (!is_unit_none(right->expr.constant.unit) && !is_unit_unknown(right->expr.constant.unit)) {
-            debug("Degree somehow has a unit\n");
-            return NULL;
-        }
-        expr->expr.unit = unit_new_single(left->expr.unit.types[0], right->expr.constant.value, arena);
-        debug("unit with degree: unit: %s\n", display_unit(expr->expr.unit, arena));
-        return expr;
-    }
-
-    if (expr->type == EXPR_CONVERT && right->type != EXPR_UNIT) {
-        return NULL;
-    }
-
-    expr->expr.binary_expr.left = left;
-    expr->expr.binary_expr.right = right;
-
-    return expr;
+    // Assert idxs are within 0 and tokens.length
+    TokenString left_tokens = { .tokens = tokens.tokens, .length = left_end_idx };
+    TokenString right_tokens = { .tokens = tokens.tokens + right_start_idx, .length = tokens.length - right_start_idx };
+    Expression left = parse(left_tokens, arena);
+    Expression right = parse(right_tokens, arena);
+    return expr_new_bin(type, left, right, arena);
 }
 
 const char *display_expr_op(ExprType type) {
@@ -288,23 +225,36 @@ const char *display_expr_op(ExprType type) {
             return "/";
         case EXPR_CONVERT:
             return "->";
+        case EXPR_POW:
+            return "^";
+        case EXPR_CONST_UNIT:
+            return "const x unit";
+        case EXPR_COMP_UNIT:
+            return "unit x unit";
         default:
             return "?";
     }
 }
 
 void display_expr(size_t offset, Expression expr, Arena *arena) {
+#ifdef DEBUG
     for (size_t i = 0; i < offset; i++) {
-        debug("\t");
+        printf("\t");
     }
+#endif
     if (expr.type == EXPR_CONSTANT) {
-        debug("%lf %s\n", expr.expr.constant.value, display_unit(expr.expr.constant.unit, arena));
+        debug("%lf\n", expr.expr.constant);
     } else if (expr.type == EXPR_UNIT) {
-        debug("%s\n", display_unit(expr.expr.unit, arena));
+        debug("%s\n", unit_strings[expr.expr.unit_type]);
+    } else if (expr.type == EXPR_NEG) {
+        debug("neg\n");
+        display_expr(offset + 1, *expr.expr.unary_expr.right, arena);
     } else if (expr.type == EXPR_EMPTY) {
-        debug("empty");
+        debug("empty\n");
     } else if (expr.type == EXPR_QUIT) {
-        debug("quit");
+        debug("quit\n");
+    } else if (expr.type == EXPR_INVALID) {
+        debug("invalid\n");
     } else {
         debug("op: %s\n", display_expr_op(expr.type));
         display_expr(offset + 1, *expr.expr.binary_expr.left, arena);
@@ -312,18 +262,72 @@ void display_expr(size_t offset, Expression expr, Arena *arena) {
     }
 }
 
+bool check_valid_expr(Expression expr) {
+    bool left_valid = false;
+    bool right_valid = false;
+    ExprType left_type = EXPR_INVALID;
+    ExprType right_type = EXPR_INVALID;
+    switch (expr.type) {
+        case EXPR_CONSTANT: case EXPR_UNIT:
+            return true;
+        case EXPR_NEG:
+            right_type = expr.expr.unary_expr.right->type;
+            return right_type == EXPR_CONSTANT || right_type == EXPR_NEG || right_type == EXPR_CONST_UNIT;
+        case EXPR_CONST_UNIT: case EXPR_COMP_UNIT: case EXPR_ADD: case EXPR_SUB:
+        case EXPR_MUL: case EXPR_DIV: case EXPR_CONVERT: case EXPR_POW:
+            left_type = expr.expr.binary_expr.left->type;
+            right_type = expr.expr.binary_expr.right->type;
+            left_valid = check_valid_expr(*expr.expr.binary_expr.left);
+            right_valid = check_valid_expr(*expr.expr.binary_expr.right);
+            break;
+        case EXPR_EMPTY:
+        case EXPR_QUIT:
+            return true;
+        case EXPR_INVALID:
+            return false;
+    }
+    switch (expr.type) {
+        case EXPR_CONST_UNIT:
+            return left_valid && right_valid &&
+                (left_type == EXPR_CONSTANT || left_type == EXPR_NEG) &&
+                (right_type == EXPR_UNIT || right_type == EXPR_COMP_UNIT || right_type == EXPR_POW);
+        case EXPR_COMP_UNIT:
+            return left_valid && right_valid &&
+                (left_type == EXPR_UNIT || left_type == EXPR_COMP_UNIT || left_type == EXPR_POW) &&
+                (right_type == EXPR_UNIT || right_type == EXPR_POW);
+        case EXPR_ADD: case EXPR_SUB: case EXPR_MUL: case EXPR_DIV:
+            return left_valid && right_valid &&
+                (left_type == EXPR_CONSTANT || left_type == EXPR_CONST_UNIT ||
+                 left_type == EXPR_NEG || left_type == EXPR_ADD || left_type == EXPR_SUB ||
+                 left_type == EXPR_MUL || left_type == EXPR_DIV) &&
+                (right_type == EXPR_CONSTANT || right_type == EXPR_CONST_UNIT ||
+                 right_type == EXPR_NEG || right_type == EXPR_ADD || right_type == EXPR_SUB ||
+                 right_type == EXPR_MUL || right_type == EXPR_DIV);
+        case EXPR_CONVERT:
+            return left_valid && right_valid &&
+                (right_type == EXPR_UNIT || right_type == EXPR_COMP_UNIT || right_type == EXPR_POW);
+        case EXPR_POW:
+            return left_valid && right_valid &&
+                (left_type == EXPR_UNIT) && (right_type == EXPR_CONSTANT || right_type == EXPR_NEG);
+        default:
+            return false; // unreachable
+    }
+}
+
 Unit check_unit(Expression expr, Arena *arena) {
     if (expr.type == EXPR_CONSTANT) {
-        debug("constant unit: %s\n", display_unit(expr.expr.constant.unit, arena));
-        return expr.expr.constant.unit;
+        debug("constant: %lf\n", expr.expr.constant);
+        return unit_new_none(arena);
     } else if (expr.type == EXPR_UNIT) {
-        debug("unit: %s\n", display_unit(expr.expr.unit, arena));
-        return expr.expr.unit;
-    } else if (expr.type == EXPR_EMPTY || expr.type == EXPR_QUIT) {
-        debug("empty or quit, no unit\n");
+        debug("unit: %s\n", unit_strings[expr.expr.unit_type]);
+        return unit_new_single(expr.expr.unit_type, 1, arena);
+    } else if (expr.type == EXPR_NEG) {
+        debug("neg\n");
+        return check_unit(*expr.expr.unary_expr.right, arena);
+    } else if (expr.type == EXPR_EMPTY || expr.type == EXPR_QUIT || expr.type == EXPR_INVALID) {
+        debug("empty, quit, or invalid, no unit: %d\n", expr.type);
         return unit_new_unknown(arena);
     }
-
 
     Unit left = check_unit(*expr.expr.binary_expr.left, arena);
     Unit right = check_unit(*expr.expr.binary_expr.right, arena);
@@ -355,6 +359,15 @@ Unit check_unit(Expression expr, Arena *arena) {
         return right;
     }
 
+    if (expr.type == EXPR_POW) {
+        if (is_unit_unknown(left) || is_unit_none(left) || left.length != 1 || !is_unit_none(right)) {
+            printf("Expected single degree unit ^ constant: %s ^ %s\n", display_unit(left, arena), display_unit(right, arena));
+            return unit_new_unknown(arena);
+        }
+        left.degrees[0] *= expr.expr.binary_expr.right->expr.constant;
+        return left;
+    }
+
     Unit unit = unit_new_unknown(arena);
     if (is_unit_none(left)) {
         unit = right;
@@ -365,7 +378,7 @@ Unit check_unit(Expression expr, Arena *arena) {
         unit = unit_new_unknown(arena);
     } else if ((expr.type == EXPR_ADD || expr.type == EXPR_SUB) && units_equal(left, right)) {
         unit = right;
-    } else if (expr.type == EXPR_MUL) {
+    } else if (expr.type == EXPR_MUL || expr.type == EXPR_COMP_UNIT) {
         unit = unit_combine(left, right, arena);
     } else if (expr.type == EXPR_DIV) {
         for (size_t i = 0; i < right.length; i++) {
@@ -381,15 +394,37 @@ Unit check_unit(Expression expr, Arena *arena) {
 }
 
 double evaluate(Expression expr, Arena *arena) {
-    if (expr.type == EXPR_CONSTANT) {
-        return expr.expr.constant.value;
-    } else if (expr.type == EXPR_UNIT) {
-        return 0;
+    double left = 0;
+    double right = 0;
+    Unit left_unit, right_unit;
+    switch (expr.type) {
+        case EXPR_CONSTANT:
+            return expr.expr.constant;
+        case EXPR_UNIT:
+            return 0;
+        case EXPR_NEG:
+            return -evaluate(*expr.expr.unary_expr.right, arena);
+        case EXPR_CONST_UNIT:
+            return evaluate(*expr.expr.binary_expr.left, arena);
+        case EXPR_COMP_UNIT:
+            return 0;
+        case EXPR_ADD: case EXPR_SUB: case EXPR_MUL: case EXPR_DIV:
+            left = evaluate(*expr.expr.binary_expr.left, arena);
+            right = evaluate(*expr.expr.binary_expr.right, arena);
+            break;
+        case EXPR_CONVERT:
+            // TODO: Return a unit tree from check_unit so we don't have to run this
+            // (and allocate memory) again?
+            left_unit = check_unit(*expr.expr.binary_expr.left, arena);
+            right_unit = check_unit(*expr.expr.binary_expr.right, arena);
+            left = evaluate(*expr.expr.binary_expr.left, arena);
+            return left * unit_convert(left_unit.types[0], right_unit.types[0]);
+        case EXPR_POW: // Pow only means unit degrees for now
+        case EXPR_EMPTY:
+        case EXPR_QUIT:
+        case EXPR_INVALID:
+            return 0; // unreachable
     }
-    double left = evaluate(*expr.expr.binary_expr.left, arena);
-    double right = evaluate(*expr.expr.binary_expr.right, arena);
-    Unit left_unit;
-    Unit right_unit;
     switch (expr.type) {
         case EXPR_ADD:
             return left + right;
@@ -399,13 +434,7 @@ double evaluate(Expression expr, Arena *arena) {
             return left * right;
         case EXPR_DIV:
             return left / right;
-        case EXPR_CONVERT:
-            // TODO: Return a unit tree from check_unit so we don't have to run this
-            // (and allocate memory) again?
-            left_unit = check_unit(*expr.expr.binary_expr.left, arena);
-            right_unit = check_unit(*expr.expr.binary_expr.right, arena);
-            return left * unit_convert(left_unit.types[0], right_unit.types[0]);
         default:
-            exit(1); // TODO
+            return 0; // unreachable
     }
 }
