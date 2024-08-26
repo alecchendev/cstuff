@@ -292,9 +292,6 @@ void test_invalid_expr(void *_) {
     Arena case_arena = arena_create();
     InvalidExprCase cases[] = {
         {"1 +"},
-        // These actually work!
-        /*{"50 km ^ -2 ^ 3"},*/
-        /*{"50 km ^ -2 km"},*/
     };
     const size_t num_cases = sizeof(cases) / sizeof(InvalidExprCase);
     bool all_passed = true;
@@ -336,6 +333,8 @@ void test_check_unit(void *_) {
         {"1km*2mi*3h*4km*5mi*2s", unit_new((UnitType[]){UNIT_KILOMETER, UNIT_MILE, UNIT_HOUR, UNIT_SECOND}, (int[]){2, 2, 1, 1}, 4, &case_arena)},
         {"1km*2mi*3h*4km*5mi*2s+3km", unit_new_unknown(&case_arena)},
         {"1km*2mi/4km", unit_new((UnitType[]){UNIT_MILE}, (int[]){1}, 1, &case_arena)},
+        {"50 km ^ -2 ^ 3", unit_new_single(UNIT_KILOMETER, -6, &case_arena)},
+        {"50 km ^ -2 km", unit_new_single(UNIT_KILOMETER, -1, &case_arena)},
         {"1km -> mi", unit_new_single(UNIT_MILE, 1, &case_arena)},
         {"1km -> s", unit_new_unknown(&case_arena)},
         {"1kg -> h", unit_new_unknown(&case_arena)},

@@ -52,7 +52,8 @@ bool check_valid_expr(Expression expr) {
                 (right_type == EXPR_UNIT || right_type == EXPR_COMP_UNIT || right_type == EXPR_POW);
         case EXPR_POW:
             return left_valid && right_valid &&
-                (left_type == EXPR_UNIT) && (right_type == EXPR_CONSTANT || right_type == EXPR_NEG);
+                (left_type == EXPR_UNIT || left_type == EXPR_COMP_UNIT || left_type == EXPR_POW) &&
+                (right_type == EXPR_CONSTANT || right_type == EXPR_NEG);
         default:
             assert(false);
             return false;

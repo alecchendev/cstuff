@@ -117,6 +117,7 @@ bool left_associative(TokenType op, size_t idx, bool prev_is_bin_op) {
     if (op == TOK_MUL || op == TOK_DIV) return true;
     if (op == TOK_NUM) return false;
     if (op == TOK_UNIT && idx != 0) return true;
+    if (op == TOK_CARET) return true;
     return false;
 }
 
