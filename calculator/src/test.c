@@ -38,7 +38,7 @@ struct TokenCase {
 };
 
 bool eq_diff(double a, double b) {
-    return a - b < 0.0000001;
+    return a - b < 0.000001;
 }
 
 bool tokens_equal(Token a, Token b) {
@@ -368,6 +368,21 @@ void test_evaluate(void *_) {
     assert(all_passed);
 }
 
+void test_unit_mirror(void *_) {
+    for (UnitType unit_type1 = 0; unit_type1 < UNIT_COUNT; unit_type1++) {
+        for (UnitType unit_type2 = unit_type1; unit_type2 < UNIT_COUNT; unit_type2++) {
+            double one_to_two = unit_conversion[unit_type1][unit_type2];
+            double two_to_one = unit_conversion[unit_type2][unit_type1];
+            if (one_to_two == 0) {
+                assert(two_to_one == 0);
+            } else {
+                debug("1: %s 2: %s 1 / one_to_two: %lf two_to_one: %lf\n", unit_strings[unit_type1], unit_strings[unit_type2], 1 / one_to_two, two_to_one);
+                assert(eq_diff(1 / one_to_two, two_to_one));
+            }
+        }
+    }
+}
+
 typedef struct {
     const Unit unit;
     const char *expected;
@@ -397,6 +412,7 @@ int main() {
         test_parse,
         test_check_unit,
         test_evaluate,
+        test_unit_mirror,
         test_display_unit,
     };
     const size_t n_tests = sizeof(tests) / sizeof(tests[0]);

@@ -29,7 +29,7 @@ enum UnitType {
     UNIT_UNKNOWN,
 };
 
-#define MAX_UNIT_STRING 3
+#define MAX_UNIT_STRING 7
 
 const char *unit_strings[] = {
     // Distance
@@ -87,123 +87,23 @@ UnitCategory unit_category(UnitType type) {
     }
 }
 
-double unit_convert(UnitType a, UnitType b);
-
-double unit_convert_through(UnitType a, UnitType b, UnitType c) {
-    return unit_convert(a, c) * unit_convert(c, b);
-}
-
-// TODO: just convert this into a simple table
-double unit_convert(UnitType a, UnitType b) {
-    if (a == b) return 1;
-    // Everything is defined big -> small, otherwise reuse other conversions
-    switch (a) {
-        case UNIT_CENTIMETER:
-            switch (b) {
-                case UNIT_METER: return 1 / unit_convert(b, a);
-                case UNIT_KILOMETER: return 1 / unit_convert(b, a);
-                case UNIT_INCH: return 1 / unit_convert(b, a);
-                case UNIT_FOOT: return 1 / unit_convert(b, a);
-                case UNIT_MILE: return 1 / unit_convert(b, a);
-                default: return 0;
-            }
-        case UNIT_METER:
-            switch (b) {
-                case UNIT_CENTIMETER: return 100;
-                case UNIT_KILOMETER: return 1 / unit_convert(b, a);
-                case UNIT_INCH: return unit_convert_through(a, b, UNIT_FOOT);
-                case UNIT_FOOT: return 3.2808399;
-                case UNIT_MILE: return 1 / unit_convert(b, a);
-                default: return 0;
-            }
-        case UNIT_KILOMETER:
-            switch (b) {
-                case UNIT_CENTIMETER: return unit_convert_through(a, b, UNIT_METER);
-                case UNIT_METER: return 1000;
-                case UNIT_INCH: return unit_convert_through(a, b, UNIT_FOOT);
-                case UNIT_FOOT: return unit_convert_through(a, b, UNIT_METER);
-                case UNIT_MILE: return 1 / unit_convert(b, a);
-                default: return 0;
-            }
-        case UNIT_INCH:
-            switch (b) {
-                case UNIT_CENTIMETER: return 2.54;
-                case UNIT_METER: return 1 / unit_convert(b, a);
-                case UNIT_KILOMETER: return 1 / unit_convert(b, a);
-                case UNIT_FOOT: return 1 / unit_convert(b, a);
-                case UNIT_MILE: return 1 / unit_convert(b, a);
-                default: return 0;
-            }
-        case UNIT_FOOT:
-            switch (b) {
-                case UNIT_CENTIMETER: return unit_convert_through(a, b, UNIT_INCH);
-                case UNIT_METER: return 1 / unit_convert(b, a);
-                case UNIT_KILOMETER: return 1 / unit_convert(b, a);
-                case UNIT_INCH: return 12;
-                case UNIT_MILE: return 1 / unit_convert(b, a);
-                default: return 0;
-            }
-        case UNIT_MILE:
-            switch (b) {
-                case UNIT_CENTIMETER: return unit_convert_through(a, b, UNIT_METER);
-                case UNIT_METER: return unit_convert_through(a, b, UNIT_KILOMETER);
-                case UNIT_KILOMETER: return 1.609344;
-                case UNIT_INCH: return unit_convert_through(a, b, UNIT_FOOT);
-                case UNIT_FOOT: return 5280;
-                default: return 0;
-            }
-        case UNIT_SECOND:
-            switch (b) {
-                case UNIT_MINUTE: return 1 / unit_convert(b, a);
-                case UNIT_HOUR: return 1 / unit_convert(b, a);
-                default: return 0;
-            }
-        case UNIT_MINUTE:
-            switch (b) {
-                case UNIT_SECOND: return 60;
-                case UNIT_HOUR: return 1 / unit_convert(b, a);
-                default: return 0;
-            }
-        case UNIT_HOUR:
-            switch (b) {
-                case UNIT_SECOND: return unit_convert_through(a, b, UNIT_MINUTE);
-                case UNIT_MINUTE: return 60;
-                default: return 0;
-            }
-        case UNIT_GRAM:
-            switch (b) {
-                case UNIT_KILOGRAM: return 1 / unit_convert(b, a);
-                case UNIT_OUNCE: return 1 / unit_convert(b, a);
-                case UNIT_POUND: return 1 / unit_convert(b, a);
-                default: return 0;
-            }
-        case UNIT_KILOGRAM:
-            switch (b) {
-                case UNIT_GRAM: return 1000;
-                case UNIT_OUNCE: return unit_convert_through(a, b, UNIT_POUND);
-                case UNIT_POUND: return 2.20462262;
-                default: return 0;
-            }
-        case UNIT_OUNCE:
-            switch (b) {
-                case UNIT_GRAM: return 28.3495231;
-                case UNIT_KILOGRAM: return 1 / unit_convert(b, a);
-                case UNIT_POUND: return 1 / unit_convert(b, a);
-                default: return 0;
-            }
-        case UNIT_POUND:
-            switch (b) {
-                case UNIT_GRAM: return unit_convert_through(a, b, UNIT_OUNCE);
-                case UNIT_KILOGRAM: return 1 / unit_convert(b, a);
-                case UNIT_OUNCE: return 16;
-                default: return 0;
-            }
-        case UNIT_COUNT:
-        case UNIT_NONE:
-        case UNIT_UNKNOWN:
-            return 0;
-    }
-}
+// TODO: think more about precision
+double unit_conversion[UNIT_COUNT][UNIT_COUNT] = {
+    //     cm, m, km, in, ft, mi, s, min, h, g, kg, oz, lb
+    /*cm*/ {1, 0.01, 0.00001, 1/2.54, 1/(2.54*12), 1/(2.54*12*5280), 0, 0, 0, 0, 0, 0, 0, },
+    /*m */ {100, 1, 0.001, 39.3700787, 3.2808399, 3.2808399/5280, 0, 0, 0, 0, 0, 0, 0, },
+    /*km*/ {100000, 1000, 1, 39370.0787, 3280.8399, 0.62137119, 0, 0, 0, 0, 0, 0, 0, },
+    /*in*/ {2.54, 0.0254, 0.0000254, 1, 1.0/12, 1.0/(12*5280), 0, 0, 0, 0, 0, 0, 0, },
+    /*ft*/ {30.48, 0.3048, 0.0003048, 12, 1, 1.0/5280, 0, 0, 0, 0, 0, 0, 0, },
+    /*mi*/ {160934.4, 1609.344, 1.609344, 63360, 5280, 1, 0, 0, 0, 0, 0, 0, 0, },
+    /*s*/  {0, 0, 0, 0, 0, 0, 1, 1.0/60, 1.0/3600, 0, 0, 0, 0, },
+    /*min*/{0, 0, 0, 0, 0, 0, 60, 1, 1.0/60, 0, 0, 0, 0, },
+    /*h*/  {0, 0, 0, 0, 0, 0, 3600, 60, 1, 0, 0, 0, 0, },
+    /*g*/  {0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0.001, 0.0352739619, 0.00220462262, },
+    /*kg*/ {0, 0, 0, 0, 0, 0, 0, 0, 0, 1000, 1, 35.2739619, 2.20462262, },
+    /*oz*/ {0, 0, 0, 0, 0, 0, 0, 0, 0, 28.3495231, 0.0283495231, 1, 1.0/16, },
+    /*lb*/ {0, 0, 0, 0, 0, 0, 0, 0, 0, 453.59237, 0.45359237, 16, 1, },
+};
 
 typedef struct Unit Unit;
 struct Unit {

@@ -160,7 +160,7 @@ double evaluate(Expression expr, Arena *arena) {
             left_unit = check_unit(*expr.expr.binary_expr.left, arena);
             right_unit = check_unit(*expr.expr.binary_expr.right, arena);
             left = evaluate(*expr.expr.binary_expr.left, arena);
-            return left * unit_convert(left_unit.types[0], right_unit.types[0]);
+            return left * unit_conversion[left_unit.types[0]][right_unit.types[0]];
         case EXPR_POW: // Pow only means unit degrees for now
         case EXPR_EMPTY:
         case EXPR_QUIT:
