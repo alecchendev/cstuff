@@ -1,10 +1,9 @@
 #pragma once
 
 #include <stdbool.h>
-#include <stdio.h>
 #include "tokenize.c"
 #include "arena.c"
-#include "log.c"
+#include "debug.c"
 
 typedef struct Expression Expression;
 typedef struct Constant Constant;
@@ -256,6 +255,8 @@ void display_expr(size_t offset, Expression expr, Arena *arena) {
     } else if (expr.type == EXPR_INVALID) {
         debug("invalid\n");
     } else {
+        assert(expr.expr.binary_expr.left != NULL);
+        assert(expr.expr.binary_expr.right != NULL);
         debug("op: %s\n", display_expr_op(expr.type));
         display_expr(offset + 1, *expr.expr.binary_expr.left, arena);
         display_expr(offset + 1, *expr.expr.binary_expr.right, arena);

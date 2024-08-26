@@ -5,21 +5,7 @@
 #include "evaluate.c"
 #include "parse.c"
 #include "tokenize.c"
-
-#define assert(condition) \
-    ((condition) ? (void)0 : \
-    __assert_fail(#condition, __FUNCTION__, __FILE__, __LINE__))
-
-void __assert_fail(const char *condition, const char *function, const char *file, 
-                   unsigned int line) {
-    fprintf(stderr, "Assertion failed: %s, function %s, file %s, line %u.\n",
-            condition, function, file, line);
-    abort();
-}
-
-// TODO: do some sort of generic display to show
-// the expected and actual values
-#define assert_eq(a, b) assert((a) == (b))
+#include "debug.c"
 
 bool fork_test_case(size_t case_num, void (*test)(void *), void *c_opaque,
                     const char *pass_str, const char *fail_str) {

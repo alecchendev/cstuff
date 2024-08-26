@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include "log.c"
+#include "debug.c"
 
 typedef struct ArenaBlock ArenaBlock;
 struct ArenaBlock {
@@ -24,6 +24,7 @@ struct Arena {
 
 ArenaBlock *arena_block_create(size_t size) {
     ArenaBlock *block = malloc(sizeof(ArenaBlock) + size);
+    assert(block != NULL);
     block->size = size;
     block->used = 0;
     block->next = NULL;
@@ -48,6 +49,7 @@ void *arena_alloc(Arena *arena, size_t size) {
         prev = block;
         block = block->next;
     }
+    assert(prev != NULL);
     size_t new_size = prev->size * 2 >= size ? prev->size * 2 : size;
     debug("Allocating new block, curr_size: %zu new_size: %zu requested: %zu\n", prev->size, new_size, size);
     ArenaBlock *new_block = arena_block_create(new_size);

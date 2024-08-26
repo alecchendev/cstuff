@@ -51,7 +51,8 @@ bool check_valid_expr(Expression expr) {
             return left_valid && right_valid &&
                 (left_type == EXPR_UNIT) && (right_type == EXPR_CONSTANT || right_type == EXPR_NEG);
         default:
-            return false; // unreachable
+            assert(false);
+            return false;
     }
 }
 
@@ -164,7 +165,8 @@ double evaluate(Expression expr, Arena *arena) {
         case EXPR_EMPTY:
         case EXPR_QUIT:
         case EXPR_INVALID:
-            return 0; // unreachable
+            assert(false);
+            return 0;
     }
     switch (expr.type) {
         case EXPR_ADD:
@@ -176,6 +178,7 @@ double evaluate(Expression expr, Arena *arena) {
         case EXPR_DIV:
             return left / right;
         default:
-            return 0; // unreachable
+            assert(false);
+            return 0;
     }
 }

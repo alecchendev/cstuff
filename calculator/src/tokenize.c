@@ -2,11 +2,10 @@
 
 #include <math.h>
 #include <stdbool.h>
-#include <stdio.h>
 #include <string.h>
 #include "arena.c"
 #include "unit.c"
-#include "log.c"
+#include "debug.c"
 
 typedef enum TokenType TokenType;
 enum TokenType {
@@ -135,7 +134,7 @@ Token next_token(const char *input, size_t *pos, size_t length) {
         } else if (input[*pos] == '/') {
             token = div_token;
         } else {
-            token = (Token){TOK_CARET};
+            token = caret_token;
         }
         (*pos)++;
         return token;

@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include "arena.c"
-#include "log.c"
+#include "debug.c"
 
 typedef enum UnitType UnitType;
 enum UnitType {
@@ -241,6 +241,8 @@ Unit unit_new_unknown(Arena *arena) {
 }
 
 Unit unit_combine(Unit a, Unit b, Arena *arena) {
+    assert(!is_unit_unknown(a));
+    assert(!is_unit_unknown(b));
     if (is_unit_none(a)) return b;
     if (is_unit_none(b)) return a;
     bool *a_leftover = arena_alloc(arena, a.length * sizeof(bool));
