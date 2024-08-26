@@ -184,24 +184,6 @@ Unit unit_combine(Unit a, Unit b, Arena *arena) {
     return (Unit) { .types = types, .degrees = degrees, .length = length };
 }
 
-bool units_equal(Unit a, Unit b) {
-    if (a.length != b.length) {
-        printf("Lengths not equal: Expected: %zu Got: %zu\n", b.length, a.length);
-        return false;
-    }
-    for (size_t i = 0; i < a.length; i++) {
-        if (a.types[i] != b.types[i]) {
-            printf("Types not equal: Expected: %d Got: %d\n", b.types[i], a.types[i]);
-            return false;
-        }
-        if (a.degrees[i] != b.degrees[i]) {
-            printf("Degrees not equal: Expected: %d Got: %d\n", b.degrees[i], a.degrees[i]);
-            return false;
-        }
-    }
-    return true;
-}
-
 #define MAX_UNITS_DISPLAY 32
 #define MAX_DEGREE_STRING 4
 #define MAX_UNIT_WITH_DEGREE_STRING MAX_UNIT_STRING + MAX_DEGREE_STRING
@@ -229,4 +211,27 @@ char *display_unit(Unit unit, Arena *arena) {
         }
     }
     return str;
+}
+
+bool units_equal(Unit a, Unit b, Arena *arena) {
+    if (a.length != b.length) {
+        printf("Lengths not equal: Expected: %zu Got: %zu\n", b.length, a.length);
+        return false;
+    }
+    // For every element in a, look for it in b.
+    bool all_found = true;
+    for (size_t i = 0; i < a.length; i++) {
+        bool found = false;
+        for (size_t j = 0; j < b.length; j++) {
+            if (a.types[i] == b.types[j] && a.degrees[i] == b.degrees[j]) {
+                found = true;
+            }
+        }
+        all_found &= found;
+    }
+    if (!all_found) {
+        printf("Units don't match: Left: %s Right %s\n",
+            display_unit(a, arena), display_unit(b, arena));
+    }
+    return true;
 }

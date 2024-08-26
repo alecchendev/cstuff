@@ -317,7 +317,7 @@ void test_check_unit_case(void *c_opaque) {
     display_expr(0, expr, &arena);
     assert(check_valid_expr(expr));
     Unit unit = check_unit(expr, &arena);
-    assert(units_equal(unit, c->expected));
+    assert(units_equal(unit, c->expected, &arena));
     arena_free(&arena);
 }
 
@@ -335,6 +335,10 @@ void test_check_unit(void *_) {
         {"1km*2mi/4km", unit_new((UnitType[]){UNIT_MILE}, (int[]){1}, 1, &case_arena)},
         {"50 km ^ -2 ^ 3", unit_new_single(UNIT_KILOMETER, -6, &case_arena)},
         {"50 km ^ -2 km", unit_new_single(UNIT_KILOMETER, -1, &case_arena)},
+        {"50 km s^-1 + 50 s^-1 km", unit_new((UnitType[]){UNIT_KILOMETER, UNIT_SECOND},
+            (int[]){1, -1}, 2, &case_arena)},
+        {"50 s^-1 km + 50 km s^-1", unit_new((UnitType[]){UNIT_SECOND, UNIT_KILOMETER},
+            (int[]){-1, 1}, 2, &case_arena)},
         {"1km -> mi", unit_new_single(UNIT_MILE, 1, &case_arena)},
         {"1km -> s", unit_new_unknown(&case_arena)},
         {"1kg -> h", unit_new_unknown(&case_arena)},

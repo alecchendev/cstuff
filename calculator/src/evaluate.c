@@ -126,9 +126,9 @@ Unit check_unit(Expression expr, Arena *arena) {
         // Case to make sure we don't print our error message again
         debug("unit unknown\n");
         unit = unit_new_unknown(arena);
-    } else if ((expr.type == EXPR_ADD || expr.type == EXPR_SUB) && units_equal(left, right)) {
+    } else if ((expr.type == EXPR_ADD || expr.type == EXPR_SUB) && units_equal(left, right, arena)) {
         debug("units equal\n");
-        unit = right;
+        unit = left;
     } else if (expr.type == EXPR_MUL || expr.type == EXPR_COMP_UNIT) {
         debug("combining units\n");
         unit = unit_combine(left, right, arena);
