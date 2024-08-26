@@ -178,6 +178,7 @@ void test_parse_case(void *c_opaque) {
     debug("Got:\n");
     display_expr(0, expr, &arena);
     assert(exprs_equal(expr, c->expected, &arena));
+    assert(check_valid_expr(expr));
     arena_free(&arena);
 }
 
@@ -262,11 +263,7 @@ void test_parse(void *_) {
         &case_arena)}
         /*{"1 + 2km * 3 h / 2 km ^-2"}*/
 
-        // "5 s^-2 km^3 cm^4 oz^5 lb * 2 s^2 / km ^3"
-        // TODO: invalid expression
-        /*{"50 km ^ -2 ^ 3"}*/
-        /*{"50 km ^ -2 km"}*/
-        /*{"1 +"},*/
+        // "5 s^-2 km^3 cm^4 oz^5 lb * 2 s^2 / 3 km ^3"
     };
     const size_t num_cases = sizeof(cases) / sizeof(ParseCase);
     bool all_passed = true;
@@ -277,6 +274,38 @@ void test_parse(void *_) {
     assert(all_passed);
     arena_free(&case_arena);
 }
+
+typedef struct {
+    const char *input;
+} InvalidExprCase;
+
+void test_invalid_expr_case(void *c_opaque) {
+    InvalidExprCase *c = (InvalidExprCase *)c_opaque;
+    Arena arena = arena_create();
+    TokenString tokens = tokenize(c->input, &arena);
+    Expression expr = parse(tokens, &arena);
+    assert(!check_valid_expr(expr));
+    arena_free(&arena);
+}
+
+void test_invalid_expr(void *_) {
+    Arena case_arena = arena_create();
+    InvalidExprCase cases[] = {
+        {"1 +"},
+        // These actually work!
+        /*{"50 km ^ -2 ^ 3"},*/
+        /*{"50 km ^ -2 km"},*/
+    };
+    const size_t num_cases = sizeof(cases) / sizeof(InvalidExprCase);
+    bool all_passed = true;
+    for (size_t i = 0; i < num_cases; i++) {
+        all_passed &= fork_test_case(i, test_invalid_expr_case, (void *)&cases[i],
+                                     NULL, "Case %zu failed\n");
+    }
+    assert(all_passed);
+    arena_free(&case_arena);
+}
+
 
 typedef struct {
     const char *input;
@@ -410,6 +439,7 @@ int main() {
     void (*tests[])(void *) = {
         test_tokenize,
         test_parse,
+        test_invalid_expr,
         test_check_unit,
         test_evaluate,
         test_unit_mirror,
