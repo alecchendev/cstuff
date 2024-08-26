@@ -80,12 +80,6 @@ Unit check_unit(Expression expr, Arena *arena) {
     debug("left: %s, right: %s\n", display_unit(left, arena), display_unit(right, arena));
 
     if (expr.type == EXPR_CONVERT) {
-        // check if we are able to convert
-        // test with single units first
-        if (left.length != 1 || right.length != 1) {
-            printf("Cannot convert between composite units\n");
-            return unit_new_unknown(arena);
-        }
         if (is_unit_none(left) || is_unit_none(right)) {
             printf("Cannot convert to or from no unit\n");
             return unit_new_unknown(arena);
@@ -94,12 +88,8 @@ Unit check_unit(Expression expr, Arena *arena) {
             printf("Cannot convert to or from unknown unit\n");
             return unit_new_unknown(arena);
         }
-        if (left.degrees[0] != 1 || right.degrees[0] != 1) {
-            printf("Cannot convert between units with degrees other than 1\n");
-            return unit_new_unknown(arena);
-        }
-        if (unit_category(left.types[0]) != unit_category(right.types[0])) {
-            printf("Cannot convert between different unit categories\n");
+        if (!unit_convert_valid(left, right, arena)) {
+            // Already printed reason inside of function
             return unit_new_unknown(arena);
         }
         return right;
@@ -171,7 +161,7 @@ double evaluate(Expression expr, Arena *arena) {
             left_unit = check_unit(*expr.expr.binary_expr.left, arena);
             right_unit = check_unit(*expr.expr.binary_expr.right, arena);
             left = evaluate(*expr.expr.binary_expr.left, arena);
-            return left * unit_conversion[left_unit.types[0]][right_unit.types[0]];
+            return left * unit_convert_factor(left_unit, right_unit, arena);
         case EXPR_POW: // Pow only means unit degrees for now
         case EXPR_EMPTY:
         case EXPR_QUIT:

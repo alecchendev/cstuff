@@ -343,6 +343,8 @@ void test_check_unit(void *_) {
         {"1km -> s", unit_new_unknown(&case_arena)},
         {"1kg -> h", unit_new_unknown(&case_arena)},
         {"1 lb -> in", unit_new_unknown(&case_arena)},
+        {"2 m^2 -> cm^1", unit_new_unknown(&case_arena)},
+        {"2 km s^-1 -> kg h^-1", unit_new_unknown(&case_arena)},
     };
     const size_t num_cases = sizeof(cases) / sizeof(CheckUnitCase);
     bool all_passed = true;
@@ -390,6 +392,10 @@ void test_evaluate(void *_) {
         // Conversions
         {"1 km * 3 -> in", 118110.236400},
         {"2 s * 3 h / 2 s -> min", 180},
+        // Compositve conversions
+        {"2 m^2 -> cm^2", 20000},
+        {"2 km s^-1 -> m h^-1", 7200000},
+        {"2 min^2 cm -> m h^2", 2.0/100/60/60},
         // TODO: overflow tests
     };
     const size_t num_cases = sizeof(cases) / sizeof(EvaluateCase);

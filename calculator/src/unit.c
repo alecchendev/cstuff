@@ -1,5 +1,6 @@
 #pragma once
 
+#include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -215,7 +216,8 @@ char *display_unit(Unit unit, Arena *arena) {
 
 bool units_equal(Unit a, Unit b, Arena *arena) {
     if (a.length != b.length) {
-        printf("Lengths not equal: Expected: %zu Got: %zu\n", b.length, a.length);
+        printf("Lengths not equal: Left: %s Right %s\n",
+            display_unit(a, arena), display_unit(b, arena));
         return false;
     }
     // For every element in a, look for it in b.
@@ -225,6 +227,7 @@ bool units_equal(Unit a, Unit b, Arena *arena) {
         for (size_t j = 0; j < b.length; j++) {
             if (a.types[i] == b.types[j] && a.degrees[i] == b.degrees[j]) {
                 found = true;
+                break;
             }
         }
         all_found &= found;
@@ -234,4 +237,46 @@ bool units_equal(Unit a, Unit b, Arena *arena) {
             display_unit(a, arena), display_unit(b, arena));
     }
     return true;
+}
+
+bool unit_convert_valid(Unit a, Unit b, Arena *arena) {
+    if (a.length != b.length) {
+        printf("Convert invalid, lengths not equal: Expected: %zu Got: %zu\n", b.length, a.length);
+        return false;
+    }
+    bool all_convertible = true;
+    for (size_t i = 0; i < a.length; i++) {
+        bool convertible = false;
+        for (size_t j = 0; j < b.length; j++) {
+            if (unit_category(a.types[i]) == unit_category(b.types[j]) && a.degrees[i] == b.degrees[j]) {
+                convertible = true;
+                break;
+            }
+        }
+        all_convertible &= convertible;
+    }
+    if (!all_convertible) {
+        printf("Convert invalid: Left: %s Right %s\n",
+            display_unit(a, arena), display_unit(b, arena));
+        return false;
+    }
+    return true;
+}
+
+double unit_convert_factor(Unit a, Unit b, Arena *arena) {
+    // Should only be called if we are able to convert
+    assert(a.length == b.length);
+    double all_factor = 1;
+    for (size_t i = 0; i < a.length; i++) {
+        double factor = 0;
+        for (size_t j = 0; j < b.length; j++) {
+            if (unit_category(a.types[i]) == unit_category(b.types[j]) && a.degrees[i] == b.degrees[j]) {
+                factor = pow(unit_conversion[a.types[i]][b.types[j]], a.degrees[i]);
+                debug("Found convertible: left: %s right: %s degree: %d -> factor: %lf\n", unit_strings[a.types[i]], unit_strings[b.types[j]], a.degrees[i], factor);
+                break;
+            }
+        }
+        all_factor *= factor;
+    }
+    return all_factor;
 }
