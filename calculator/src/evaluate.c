@@ -116,18 +116,21 @@ Unit check_unit(Expression expr, Arena *arena) {
         // Case to make sure we don't print our error message again
         debug("unit unknown\n");
         unit = unit_new_unknown(arena);
-    } else if ((expr.type == EXPR_ADD || expr.type == EXPR_SUB) && units_equal(left, right, arena)) {
-        debug("units equal\n");
+    } else if ((expr.type == EXPR_ADD || expr.type == EXPR_SUB) && unit_convert_valid(right, left, arena)) {
+        debug("units convertible for add/sub\n");
         unit = left;
-    } else if (expr.type == EXPR_MUL || expr.type == EXPR_COMP_UNIT) {
-        debug("combining units\n");
-        unit = unit_combine(left, right, arena);
+    } else if (expr.type == EXPR_MUL) {
+        debug("combining units for mul\n");
+        unit = unit_combine(left, right, false, arena);
+    } else if (expr.type == EXPR_COMP_UNIT) {
+        debug("combining units for comp\n");
+        unit = unit_combine(left, right, true, arena);
     } else if (expr.type == EXPR_DIV) {
         debug("dividing units\n");
         for (size_t i = 0; i < right.length; i++) {
             right.degrees[i] *= -1;
         }
-        unit = unit_combine(left, right, arena);
+        unit = unit_combine(left, right, false, arena);
     } else {
         printf("Units do not match: %s %s %s\n", display_unit(left, arena),
            display_expr_op(expr.type), display_unit(right, arena));
@@ -152,6 +155,8 @@ double evaluate(Expression expr, Arena *arena) {
         case EXPR_COMP_UNIT:
             return 0;
         case EXPR_ADD: case EXPR_SUB: case EXPR_MUL: case EXPR_DIV:
+            left_unit = check_unit(*expr.expr.binary_expr.left, arena);
+            right_unit = check_unit(*expr.expr.binary_expr.right, arena);
             left = evaluate(*expr.expr.binary_expr.left, arena);
             right = evaluate(*expr.expr.binary_expr.right, arena);
             break;
@@ -169,6 +174,7 @@ double evaluate(Expression expr, Arena *arena) {
             assert(false);
             return 0;
     }
+    right *= unit_convert_factor(right_unit, left_unit, arena);
     switch (expr.type) {
         case EXPR_ADD:
             return left + right;

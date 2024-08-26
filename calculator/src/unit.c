@@ -26,8 +26,8 @@ enum UnitType {
     UNIT_POUND,
     UNIT_OUNCE,
 
-    UNIT_COUNT,
     UNIT_NONE,
+    UNIT_COUNT,
     UNIT_UNKNOWN,
 };
 
@@ -51,8 +51,8 @@ const char *unit_strings[] = {
     "lb",
     "oz",
 
-    "",
     "none",
+    "",
     "unknown",
 };
 
@@ -82,29 +82,31 @@ UnitCategory unit_category(UnitType type) {
         case UNIT_POUND:
         case UNIT_OUNCE:
             return UNIT_CATEGORY_MASS;
-        case UNIT_COUNT:
         case UNIT_NONE:
+        case UNIT_COUNT:
         case UNIT_UNKNOWN:
             return UNIT_CATEGORY_NONE;
     }
 }
 
-// TODO: think more about precision
+// TODO: think more about precision, maybe rewrite some things
+// as expressions so the compiler can work some magic
 double unit_conversion[UNIT_COUNT][UNIT_COUNT] = {
-    //     cm, m, km, in, ft, mi, s, min, h, g, kg, oz, lb
-    /*cm*/ {1, 0.01, 0.00001, 1/2.54, 1/(2.54*12), 1/(2.54*12*5280), 0, 0, 0, 0, 0, 0, 0, },
-    /*m */ {100, 1, 0.001, 39.3700787, 3.2808399, 3.2808399/5280, 0, 0, 0, 0, 0, 0, 0, },
-    /*km*/ {100000, 1000, 1, 39370.0787, 3280.8399, 0.62137119, 0, 0, 0, 0, 0, 0, 0, },
-    /*in*/ {2.54, 0.0254, 0.0000254, 1, 1.0/12, 1.0/(12*5280), 0, 0, 0, 0, 0, 0, 0, },
-    /*ft*/ {30.48, 0.3048, 0.0003048, 12, 1, 1.0/5280, 0, 0, 0, 0, 0, 0, 0, },
-    /*mi*/ {160934.4, 1609.344, 1.609344, 63360, 5280, 1, 0, 0, 0, 0, 0, 0, 0, },
-    /*s*/  {0, 0, 0, 0, 0, 0, 1, 1.0/60, 1.0/3600, 0, 0, 0, 0, },
-    /*min*/{0, 0, 0, 0, 0, 0, 60, 1, 1.0/60, 0, 0, 0, 0, },
-    /*h*/  {0, 0, 0, 0, 0, 0, 3600, 60, 1, 0, 0, 0, 0, },
-    /*g*/  {0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0.001, 0.0352739619, 0.00220462262, },
-    /*kg*/ {0, 0, 0, 0, 0, 0, 0, 0, 0, 1000, 1, 35.2739619, 2.20462262, },
-    /*oz*/ {0, 0, 0, 0, 0, 0, 0, 0, 0, 28.3495231, 0.0283495231, 1, 1.0/16, },
-    /*lb*/ {0, 0, 0, 0, 0, 0, 0, 0, 0, 453.59237, 0.45359237, 16, 1, },
+    //     cm, m, km, in, ft, mi, s, min, h, g, kg, oz, lb, none
+    /*cm*/ {1, 0.01, 0.00001, 1/2.54, 1/(2.54*12), 1/(2.54*12*5280), 0, 0, 0, 0, 0, 0, 0, 1},
+    /*m */ {100, 1, 0.001, 39.3700787, 3.2808399, 3.2808399/5280, 0, 0, 0, 0, 0, 0, 0, 1},
+    /*km*/ {100000, 1000, 1, 39370.0787, 3280.8399, 0.62137119, 0, 0, 0, 0, 0, 0, 0, 1},
+    /*in*/ {2.54, 0.0254, 0.0000254, 1, 1.0/12, 1.0/(12*5280), 0, 0, 0, 0, 0, 0, 0, 1},
+    /*ft*/ {30.48, 0.3048, 0.0003048, 12, 1, 1.0/5280, 0, 0, 0, 0, 0, 0, 0, 1},
+    /*mi*/ {160934.4, 1609.344, 1.609344, 63360, 5280, 1, 0, 0, 0, 0, 0, 0, 0, 1},
+    /*s*/  {0, 0, 0, 0, 0, 0, 1, 1.0/60, 1.0/3600, 0, 0, 0, 0, 1},
+    /*min*/{0, 0, 0, 0, 0, 0, 60, 1, 1.0/60, 0, 0, 0, 0, 1},
+    /*h*/  {0, 0, 0, 0, 0, 0, 3600, 60, 1, 0, 0, 0, 0, 1},
+    /*g*/  {0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0.001, 0.0352739619, 0.00220462262, 1},
+    /*kg*/ {0, 0, 0, 0, 0, 0, 0, 0, 0, 1000, 1, 35.2739619, 2.20462262, 1},
+    /*oz*/ {0, 0, 0, 0, 0, 0, 0, 0, 0, 28.3495231, 0.0283495231, 1, 1.0/16, 1},
+    /*lb*/ {0, 0, 0, 0, 0, 0, 0, 0, 0, 453.59237, 0.45359237, 16, 1, 1},
+    /*none*/{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 };
 
 typedef struct Unit Unit;
@@ -140,49 +142,6 @@ Unit unit_new_none(Arena *arena) {
 
 Unit unit_new_unknown(Arena *arena) {
     return unit_new_single(UNIT_UNKNOWN, 0, arena);
-}
-
-Unit unit_combine(Unit a, Unit b, Arena *arena) {
-    assert(!is_unit_unknown(a));
-    assert(!is_unit_unknown(b));
-    if (is_unit_none(a)) return b;
-    if (is_unit_none(b)) return a;
-    bool *a_leftover = arena_alloc(arena, a.length * sizeof(bool));
-    bool *b_leftover = arena_alloc(arena, b.length * sizeof(bool));
-    memset(a_leftover, true, a.length * sizeof(bool));
-    memset(b_leftover, true, b.length * sizeof(bool));
-    size_t length = a.length + b.length;
-    for (size_t i = 0; i < b.length; i++) {
-        for (size_t j = 0; j < a.length; j++) {
-            if (a.types[j] == b.types[i] && a.degrees[j] == -b.degrees[i]) {
-                a_leftover[j] = false;
-                b_leftover[i] = false;
-                length -= 2;
-            } else if (a.types[j] == b.types[i]) {
-                a.degrees[j] += b.degrees[i];
-                b_leftover[i] = false;
-                length -= 1;
-            }
-        }
-    }
-    UnitType *types = arena_alloc(arena, length * sizeof(UnitType));
-    int *degrees = arena_alloc(arena, length * sizeof(int));
-    size_t curr_length = 0;
-    for (size_t i = 0; i < a.length; i++) {
-        if (a_leftover[i]) {
-            types[curr_length] = a.types[i];
-            degrees[curr_length] = a.degrees[i];
-            curr_length++;
-        }
-    }
-    for (size_t i = 0; i < b.length; i++) {
-        if (b_leftover[i]) {
-            types[curr_length] = b.types[i];
-            degrees[curr_length] = b.degrees[i];
-            curr_length++;
-        }
-    }
-    return (Unit) { .types = types, .degrees = degrees, .length = length };
 }
 
 #define MAX_UNITS_DISPLAY 32
@@ -236,11 +195,11 @@ bool units_equal(Unit a, Unit b, Arena *arena) {
         printf("Units don't match: Left: %s Right %s\n",
             display_unit(a, arena), display_unit(b, arena));
     }
-    return true;
+    return all_found;
 }
 
 bool unit_convert_valid(Unit a, Unit b, Arena *arena) {
-    if (a.length != b.length) {
+    if (a.length != b.length && !is_unit_none(a) && !is_unit_none(b)) {
         printf("Convert invalid, lengths not equal: Expected: %zu Got: %zu\n", b.length, a.length);
         return false;
     }
@@ -258,19 +217,20 @@ bool unit_convert_valid(Unit a, Unit b, Arena *arena) {
     if (!all_convertible) {
         printf("Convert invalid: Left: %s Right %s\n",
             display_unit(a, arena), display_unit(b, arena));
-        return false;
     }
-    return true;
+    return all_convertible;
 }
 
 double unit_convert_factor(Unit a, Unit b, Arena *arena) {
     // Should only be called if we are able to convert
-    assert(a.length == b.length);
+    debug("a: %s b: %s a.length: %zu b.length: %zu\n",
+          display_unit(a, arena), display_unit(b, arena), a.length, b.length);
+    assert(a.length == b.length || is_unit_none(a) || is_unit_none(b));
     double all_factor = 1;
     for (size_t i = 0; i < a.length; i++) {
-        double factor = 0;
+        double factor = 1;
         for (size_t j = 0; j < b.length; j++) {
-            if (unit_category(a.types[i]) == unit_category(b.types[j]) && a.degrees[i] == b.degrees[j]) {
+            if (unit_category(a.types[i]) == unit_category(b.types[j])) {
                 factor = pow(unit_conversion[a.types[i]][b.types[j]], a.degrees[i]);
                 debug("Found convertible: left: %s right: %s degree: %d -> factor: %lf\n", unit_strings[a.types[i]], unit_strings[b.types[j]], a.degrees[i], factor);
                 break;
@@ -279,4 +239,57 @@ double unit_convert_factor(Unit a, Unit b, Arena *arena) {
         all_factor *= factor;
     }
     return all_factor;
+}
+
+Unit unit_combine(Unit a, Unit b, bool reject_same_category, Arena *arena) {
+    assert(!is_unit_unknown(a));
+    assert(!is_unit_unknown(b));
+    if (is_unit_none(a)) return b;
+    if (is_unit_none(b)) return a;
+    bool *a_leftover = arena_alloc(arena, a.length * sizeof(bool));
+    bool *b_leftover = arena_alloc(arena, b.length * sizeof(bool));
+    memset(a_leftover, true, a.length * sizeof(bool));
+    memset(b_leftover, true, b.length * sizeof(bool));
+    size_t length = a.length + b.length;
+    for (size_t i = 0; i < b.length; i++) {
+        UnitType b_type = b.types[i];
+        for (size_t j = 0; j < a.length; j++) {
+            UnitType a_type = a.types[j];
+            UnitCategory a_cat = unit_category(a_type);
+            UnitCategory b_cat = unit_category(b_type);
+            if (a_cat == b_cat && a_type != b_type && reject_same_category) {
+                return unit_new_unknown(arena);
+            } else if (a_cat == b_cat && a.degrees[j] == -b.degrees[i]) {
+                a_leftover[j] = false;
+                b_leftover[i] = false;
+                length -= 2;
+            } else if (a_cat == b_cat) {
+                debug("combining convertible units' degrees: %d %d\n", a.degrees[j], b.degrees[i]);
+                a.degrees[j] += b.degrees[i];
+                b_leftover[i] = false;
+                length -= 1;
+            }
+        }
+    }
+    UnitType *types = arena_alloc(arena, length * sizeof(UnitType));
+    int *degrees = arena_alloc(arena, length * sizeof(int));
+    size_t curr_length = 0;
+    for (size_t i = 0; i < a.length; i++) {
+        if (a_leftover[i]) {
+            types[curr_length] = a.types[i];
+            degrees[curr_length] = a.degrees[i];
+            curr_length++;
+        }
+    }
+    for (size_t i = 0; i < b.length; i++) {
+        if (b_leftover[i]) {
+            types[curr_length] = b.types[i];
+            degrees[curr_length] = b.degrees[i];
+            curr_length++;
+        }
+    }
+    if (curr_length == 0) {
+        return unit_new_none(arena);
+    }
+    return (Unit) { .types = types, .degrees = degrees, .length = length };
 }

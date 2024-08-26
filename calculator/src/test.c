@@ -38,7 +38,9 @@ struct TokenCase {
 };
 
 bool eq_diff(double a, double b) {
-    return a - b < 0.000001;
+    double diff = a - b;
+    double abs_diff = diff < 0 ? -diff : diff;
+    return abs_diff < 0.00001;
 }
 
 bool tokens_equal(Token a, Token b) {
@@ -329,12 +331,13 @@ void test_check_unit(void *_) {
         {"1 + 2 * 3", unit_new_none(&case_arena)},
         {"1 km * 2 km * 3km", unit_new_single(UNIT_KILOMETER, 3, &case_arena)},
         {"1 mi + 1h", unit_new_unknown(&case_arena)},
-        {"1 km * 2 mi * 3 h", unit_new((UnitType[]){UNIT_KILOMETER, UNIT_MILE, UNIT_HOUR}, (int[]){1, 1, 1}, 3, &case_arena)},
-        {"1km*2mi*3h*4km*5mi*2s", unit_new((UnitType[]){UNIT_KILOMETER, UNIT_MILE, UNIT_HOUR, UNIT_SECOND}, (int[]){2, 2, 1, 1}, 4, &case_arena)},
+        {"1 km * 2 oz * 3 h", unit_new((UnitType[]){UNIT_KILOMETER, UNIT_OUNCE, UNIT_HOUR}, (int[]){1, 1, 1}, 3, &case_arena)},
+        {"1km*2mi*3h*4km*5mi*2s", unit_new((UnitType[]){UNIT_KILOMETER, UNIT_HOUR}, (int[]){4, 2}, 2, &case_arena)},
         {"1km*2mi*3h*4km*5mi*2s+3km", unit_new_unknown(&case_arena)},
-        {"1km*2mi/4km", unit_new((UnitType[]){UNIT_MILE}, (int[]){1}, 1, &case_arena)},
+        {"1km*2mi/4km", unit_new((UnitType[]){UNIT_KILOMETER}, (int[]){1}, 1, &case_arena)},
         {"50 km ^ -2 ^ 3", unit_new_single(UNIT_KILOMETER, -6, &case_arena)},
         {"50 km ^ -2 km", unit_new_single(UNIT_KILOMETER, -1, &case_arena)},
+        {"2 km m cm", unit_new_unknown(&case_arena)},
         {"50 km s^-1 + 50 s^-1 km", unit_new((UnitType[]){UNIT_KILOMETER, UNIT_SECOND},
             (int[]){1, -1}, 2, &case_arena)},
         {"50 s^-1 km + 50 km s^-1", unit_new((UnitType[]){UNIT_SECOND, UNIT_KILOMETER},
@@ -390,12 +393,15 @@ void test_evaluate(void *_) {
         // Units
         {"2 cm * 3 + 1.5cm", 7.5},
         // Conversions
-        {"1 km * 3 -> in", 118110.236400},
-        {"2 s * 3 h / 2 s -> min", 180},
+        {"1 km * 3 -> in", 118110.236100},
+        {"2 s + 3 h - 6 min -> min", (2.0 + 3 * 3600 - 6 * 60) / 60},
+        {"2 s + 3 h / 6 min -> min", (2 + 3.0 / (6.0 / 60)) / 60},
+        {"6 min / 2 min * 3 s -> s", 6.0 / 2 * (3.0 / 60) * 60},
+        {"6 min * 2 min * 3 s -> s^3", 6.0 * 2 * (3.0 / 60) * 60 * 60 * 60},
         // Compositve conversions
         {"2 m^2 -> cm^2", 20000},
         {"2 km s^-1 -> m h^-1", 7200000},
-        {"2 min^2 cm -> m h^2", 2.0/100/60/60},
+        {"2 min^2 km -> m h^2", 2.0*1000/60/60},
         // TODO: overflow tests
     };
     const size_t num_cases = sizeof(cases) / sizeof(EvaluateCase);
