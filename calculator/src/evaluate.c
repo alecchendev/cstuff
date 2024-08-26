@@ -3,6 +3,8 @@
 #include "parse.c"
 #include "unit.c"
 
+double evaluate(Expression expr, Arena *arena);
+
 bool check_valid_expr(Expression expr) {
     bool left_valid = false;
     bool right_valid = false;
@@ -18,6 +20,7 @@ bool check_valid_expr(Expression expr) {
         case EXPR_MUL: case EXPR_DIV: case EXPR_CONVERT: case EXPR_POW:
             left_type = expr.expr.binary_expr.left->type;
             right_type = expr.expr.binary_expr.right->type;
+            debug("curr: %d left: %d right: %d\n", expr.type, left_type, right_type);
             left_valid = check_valid_expr(*expr.expr.binary_expr.left);
             right_valid = check_valid_expr(*expr.expr.binary_expr.right);
             break;
@@ -106,23 +109,30 @@ Unit check_unit(Expression expr, Arena *arena) {
             printf("Expected single degree unit ^ constant: %s ^ %s\n", display_unit(left, arena), display_unit(right, arena));
             return unit_new_unknown(arena);
         }
-        left.degrees[0] *= expr.expr.binary_expr.right->expr.constant;
+        debug("pow: %s ^ %lf\n", display_unit(left, arena), expr.expr.binary_expr.right->expr.constant);
+        left.degrees[0] *= evaluate(*expr.expr.binary_expr.right, arena);
         return left;
     }
 
     Unit unit = unit_new_unknown(arena);
     if (is_unit_none(left)) {
+        debug("unit left none\n");
         unit = right;
     } else if (is_unit_none(right)) {
+        debug("unit right none\n");
         unit = left;
     } else if (is_unit_unknown(left) || is_unit_unknown(right)) {
         // Case to make sure we don't print our error message again
+        debug("unit unknown\n");
         unit = unit_new_unknown(arena);
     } else if ((expr.type == EXPR_ADD || expr.type == EXPR_SUB) && units_equal(left, right)) {
+        debug("units equal\n");
         unit = right;
     } else if (expr.type == EXPR_MUL || expr.type == EXPR_COMP_UNIT) {
+        debug("combining units\n");
         unit = unit_combine(left, right, arena);
     } else if (expr.type == EXPR_DIV) {
+        debug("dividing units\n");
         for (size_t i = 0; i < right.length; i++) {
             right.degrees[i] *= -1;
         }

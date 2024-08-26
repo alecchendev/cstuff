@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdio.h>
 #include <string.h>
 #include "arena.c"
 #include "debug.c"
@@ -184,10 +185,19 @@ Unit unit_combine(Unit a, Unit b, Arena *arena) {
 }
 
 bool units_equal(Unit a, Unit b) {
-    if (a.length != b.length) return false;
+    if (a.length != b.length) {
+        printf("Lengths not equal: Expected: %zu Got: %zu\n", b.length, a.length);
+        return false;
+    }
     for (size_t i = 0; i < a.length; i++) {
-        if (a.types[i] != b.types[i]) return false;
-        if (a.degrees[i] != b.degrees[i]) return false;
+        if (a.types[i] != b.types[i]) {
+            printf("Types not equal: Expected: %d Got: %d\n", b.types[i], a.types[i]);
+            return false;
+        }
+        if (a.degrees[i] != b.degrees[i]) {
+            printf("Degrees not equal: Expected: %d Got: %d\n", b.degrees[i], a.degrees[i]);
+            return false;
+        }
     }
     return true;
 }

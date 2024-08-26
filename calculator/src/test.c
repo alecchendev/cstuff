@@ -317,6 +317,7 @@ void test_check_unit_case(void *c_opaque) {
     Arena arena = arena_create();
     TokenString tokens = tokenize(c->input, &arena);
     Expression expr = parse(tokens, &arena);
+    display_expr(0, expr, &arena);
     assert(check_valid_expr(expr));
     Unit unit = check_unit(expr, &arena);
     assert(units_equal(unit, c->expected));
