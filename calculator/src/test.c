@@ -1,4 +1,5 @@
 
+#include <string.h>
 #include <unistd.h>
 #include <stdio.h>
 #include "arena.c"
@@ -7,8 +8,19 @@
 #include "tokenize.c"
 #include "debug.c"
 
-bool fork_test_case(size_t case_num, void (*test)(void *), void *c_opaque,
+// Only global variable in this file. So
+// we don't have to pipe an extra bool through
+// our test case runners.
+static bool run_with_fork = true;
+
+bool run_test_case(size_t case_num, void (*test)(void *), void *c_opaque,
                     const char *pass_str, const char *fail_str) {
+    if (!run_with_fork) {
+        test(c_opaque);
+        if (pass_str != NULL) printf(pass_str, case_num);
+        return true;
+    }
+
     pid_t pid = fork();
     assert(pid != -1);
     if (pid == 0) {
@@ -28,6 +40,18 @@ bool fork_test_case(size_t case_num, void (*test)(void *), void *c_opaque,
             return false;
         }
     }
+}
+
+typedef struct {
+    size_t start;
+    size_t end;
+} CaseBound;
+
+CaseBound case_bound(ssize_t case_idx, size_t n_cases) {
+    assert(case_idx == -1 || (case_idx >= 0 && case_idx < n_cases));
+    size_t start = case_idx != -1 ? case_idx : 0;
+    size_t end = case_idx != -1 ? case_idx + 1 : n_cases;
+    return (CaseBound) { .start = start, .end = end };
 }
 
 typedef struct TokenCase TokenCase;
@@ -76,7 +100,7 @@ void test_tokenize_case(void *c_opaque) {
     arena_free(&arena);
 }
 
-void test_tokenize(void *_) {
+void test_tokenize(void *case_idx_opaque) {
     char max_len_input[MAX_INPUT + 1] = {0};
     memset(max_len_input, 'x', MAX_INPUT + 1);
     TokenCase cases[] = {
@@ -121,8 +145,10 @@ void test_tokenize(void *_) {
     };
     const size_t num_cases = sizeof(cases) / sizeof(TokenCase);
     bool all_passed = true;
-    for (size_t i = 0; i < num_cases; i++) {
-        all_passed &= fork_test_case(i, test_tokenize_case, (void *)&cases[i],
+    ssize_t case_idx = *(ssize_t *)case_idx_opaque;
+    CaseBound bound = case_bound(case_idx, num_cases);
+    for (size_t i = bound.start; i < bound.end; i++) {
+        all_passed &= run_test_case(i, test_tokenize_case, (void *)&cases[i],
                                      NULL, "Case %zu failed\n");
     }
     assert(all_passed);
@@ -184,7 +210,7 @@ void test_parse_case(void *c_opaque) {
     arena_free(&arena);
 }
 
-void test_parse(void *_) {
+void test_parse(void *case_idx_opaque) {
     Arena case_arena = arena_create();
     const ParseCase cases[] = {
         {"1 + 2 * 3", expr_new_bin(EXPR_ADD,
@@ -269,8 +295,10 @@ void test_parse(void *_) {
     };
     const size_t num_cases = sizeof(cases) / sizeof(ParseCase);
     bool all_passed = true;
-    for (size_t i = 0; i < num_cases; i++) {
-        all_passed &= fork_test_case(i, test_parse_case, (void *)&cases[i],
+    ssize_t case_idx = *(ssize_t *)case_idx_opaque;
+    CaseBound bound = case_bound(case_idx, num_cases);
+    for (size_t i = bound.start; i < bound.end; i++) {
+        all_passed &= run_test_case(i, test_parse_case, (void *)&cases[i],
                                      NULL, "Case %zu failed\n");
     }
     assert(all_passed);
@@ -290,7 +318,7 @@ void test_invalid_expr_case(void *c_opaque) {
     arena_free(&arena);
 }
 
-void test_invalid_expr(void *_) {
+void test_invalid_expr(void *case_idx_opaque) {
     Arena case_arena = arena_create();
     InvalidExprCase cases[] = {
         {"1 +"},
@@ -298,7 +326,7 @@ void test_invalid_expr(void *_) {
     const size_t num_cases = sizeof(cases) / sizeof(InvalidExprCase);
     bool all_passed = true;
     for (size_t i = 0; i < num_cases; i++) {
-        all_passed &= fork_test_case(i, test_invalid_expr_case, (void *)&cases[i],
+        all_passed &= run_test_case(i, test_invalid_expr_case, (void *)&cases[i],
                                      NULL, "Case %zu failed\n");
     }
     assert(all_passed);
@@ -323,7 +351,7 @@ void test_check_unit_case(void *c_opaque) {
     arena_free(&arena);
 }
 
-void test_check_unit(void *_) {
+void test_check_unit(void *case_idx_opaque) {
     Arena case_arena = arena_create();
     /*UnitT*/
     const CheckUnitCase cases[] = {
@@ -351,8 +379,10 @@ void test_check_unit(void *_) {
     };
     const size_t num_cases = sizeof(cases) / sizeof(CheckUnitCase);
     bool all_passed = true;
-    for (size_t i = 0; i < num_cases; i++) {
-        all_passed &= fork_test_case(i, test_check_unit_case, (void *)&cases[i],
+    ssize_t case_idx = *(ssize_t *)case_idx_opaque;
+    CaseBound bound = case_bound(case_idx, num_cases);
+    for (size_t i = bound.start; i < bound.end; i++) {
+        all_passed &= run_test_case(i, test_check_unit_case, (void *)&cases[i],
                                      NULL, "Case %zu failed\n");
     }
     assert(all_passed);
@@ -377,7 +407,7 @@ void test_evaluate_case(void *c_opaque) {
     arena_free(&arena);
 }
 
-void test_evaluate(void *_) {
+void test_evaluate(void *case_idx_opaque) {
     const EvaluateCase cases[] = {
         // Basic ops
         {"42", 42},
@@ -406,8 +436,10 @@ void test_evaluate(void *_) {
     };
     const size_t num_cases = sizeof(cases) / sizeof(EvaluateCase);
     bool all_passed = true;
-    for (size_t i = 0; i < num_cases; i++) {
-        all_passed &= fork_test_case(i, test_evaluate_case, (void *)&cases[i],
+    ssize_t case_idx = *(ssize_t *)case_idx_opaque;
+    CaseBound bound = case_bound(case_idx, num_cases);
+    for (size_t i = bound.start; i < bound.end; i++) {
+        all_passed &= run_test_case(i, test_evaluate_case, (void *)&cases[i],
                                      NULL, "Case %zu failed\n");
     }
     assert(all_passed);
@@ -433,7 +465,7 @@ typedef struct {
     const char *expected;
 } DisplayUnitCase;
 
-void test_display_unit(void *_) {
+void test_display_unit(void *case_idx_opaque) {
     Arena arena = arena_create();
     DisplayUnitCase cases[] = {
         {unit_new_none(&arena), "none"},
@@ -443,7 +475,9 @@ void test_display_unit(void *_) {
         {unit_new_unknown(&arena), "unknown"},
     };
     const size_t num_cases = sizeof(cases) / sizeof(DisplayUnitCase);
-    for (size_t i = 0; i < num_cases; i++) {
+    ssize_t case_idx = *(ssize_t *)case_idx_opaque;
+    CaseBound bound = case_bound(case_idx, num_cases);
+    for (size_t i = bound.start; i < bound.end; i++) {
         char *displayed = display_unit(cases[i].unit, &arena);
         debug("Expected: %s got: %s\n", cases[i].expected, displayed);
         assert(strncmp(displayed, cases[i].expected, MAX_COMPOSITE_UNIT_STRING) == 0);
@@ -451,7 +485,24 @@ void test_display_unit(void *_) {
     arena_free(&arena);
 }
 
-int main() {
+int main(int argc, char **argv) {
+    ssize_t single_test_idx = -1;
+    ssize_t single_case_idx = -1;
+    if (argc > 1) {
+        for (size_t i = 1; i < argc; i++) {
+            int value = -1;
+            if (sscanf(argv[i], "fork=%d", &value) == 1) {
+                assert(run_with_fork == 1);
+                run_with_fork = value == 1;
+            } else if (sscanf(argv[i], "test=%d", &value) == 1) {
+                assert(single_test_idx == -1);
+                single_test_idx = value;
+            } else if (sscanf(argv[i], "case=%d", &value) == 1) {
+                assert(single_case_idx == -1);
+                single_case_idx = value;
+            }
+        }
+    }
     void (*tests[])(void *) = {
         test_tokenize,
         test_parse,
@@ -463,8 +514,9 @@ int main() {
     };
     const size_t n_tests = sizeof(tests) / sizeof(tests[0]);
     bool all_passed = true;
-    for (size_t i = 0; i < n_tests; i++) {
-        all_passed &= fork_test_case(i, tests[i], NULL, "Test %zu passed\n", "Test %zu failed\n");
+    CaseBound bound = case_bound(single_test_idx, n_tests);
+    for (size_t i = bound.start; i < bound.end; i++) {
+        all_passed &= run_test_case(i, tests[i], (void *)&single_case_idx, "Test %zu passed\n", "Test %zu failed\n");
     }
     if (all_passed) {
         printf("All tests passed\n");

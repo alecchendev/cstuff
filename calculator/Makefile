@@ -1,4 +1,17 @@
 CFLAGS = -Wall -g
+ARGS ?=
+
+ifdef case
+	ARGS += case=$(case)
+endif
+
+ifdef test
+	ARGS += test=$(test)
+endif
+
+ifdef fork
+	ARGS += fork=$(fork)
+endif
 
 # Check if DEBUG is set from command line
 ifdef DEBUG
@@ -25,4 +38,4 @@ build-test: force
 	clang $(CFLAGS) src/test.c -o build/test
 
 test: build-test
-	build/test
+	build/test $(ARGS)
