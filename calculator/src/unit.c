@@ -225,7 +225,6 @@ double unit_convert_factor(Unit a, Unit b, Arena *arena) {
     // Should only be called if we are able to convert
     debug("a: %s b: %s a.length: %zu b.length: %zu\n",
           display_unit(a, arena), display_unit(b, arena), a.length, b.length);
-    assert(a.length == b.length || is_unit_none(a) || is_unit_none(b));
     double all_factor = 1;
     for (size_t i = 0; i < a.length; i++) {
         double factor = 1;

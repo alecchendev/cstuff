@@ -1,5 +1,6 @@
 
 #include <ctype.h>
+#include <stdio.h>
 #include <unistd.h>
 #include <termios.h>
 #include "evaluate.c"
@@ -7,27 +8,30 @@
 #include "tokenize.c"
 #include "arena.c"
 
-// TODO make this + repl more testable..?
-bool execute_line(const char *input) {
+bool execute_line(const char *input, char *output, size_t output_len) {
     Arena arena = arena_create();
     TokenString tokens = tokenize(input, &arena);
     Expression expr = parse(tokens, &arena);
     display_expr(0, expr, &arena);
+    bool quit = false;
     if (!check_valid_expr(expr)) {
-        printf("Invalid expression\n");
+        // TODO: make this more helpful
+        const char invalid_str[] = "Invalid expression";
+        memcpy(output, invalid_str, sizeof(invalid_str));
     } else if (expr.type == EXPR_EMPTY) {
-        // no op
+        memset(output, 0, output_len);
     } else if (expr.type == EXPR_QUIT) {
-        return true;
+        memset(output, 0, output_len);
+        quit = true;
     } else {
         Unit unit = check_unit(expr, &arena);
         if (!is_unit_unknown(unit)) {
             double result = evaluate(expr, &arena);
-            printf("%f %s\n", result, display_unit(unit, &arena));
+            snprintf(output, output_len, "%lf %s", result, display_unit(unit, &arena));
         }
     }
     arena_free(&arena);
-    return false;
+    return quit;
 }
 
 typedef enum UserInputType UserInputType;
@@ -195,7 +199,13 @@ void repl(FILE *input_fd) {
         if (input.len == 0) {
             continue;
         }
-        done = execute_line(input.data);
+        char output[256] = {0};
+        done = execute_line(input.data, output, sizeof(output));
+        if (strnlen(output, sizeof(output)) > 0) printf("%s\n", output);
+
+        if (history.len > 0 && strncmp(input.data, history.history[history.len - 1].data, MAX_INPUT) == 0) {
+            continue;
+        }
 
         // MAX_HISTORY is small enough that we can just shift everything
         if (history.len == MAX_HISTORY) {

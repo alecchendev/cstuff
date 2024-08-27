@@ -365,6 +365,8 @@ void test_check_unit(void *case_idx_opaque) {
         {"1km*2mi/4km", unit_new((UnitType[]){UNIT_KILOMETER}, (int[]){1}, 1, &case_arena)},
         {"50 km ^ -2 ^ 3", unit_new_single(UNIT_KILOMETER, -6, &case_arena)},
         {"50 km ^ -2 km", unit_new_single(UNIT_KILOMETER, -1, &case_arena)},
+        {"1 km * 2 km ^-1", unit_new_none(&case_arena)},
+        {"1 kg * 2 g ^-1", unit_new_none(&case_arena)},
         {"2 km m cm", unit_new_unknown(&case_arena)},
         {"50 km s^-1 + 50 s^-1 km", unit_new((UnitType[]){UNIT_KILOMETER, UNIT_SECOND},
             (int[]){1, -1}, 2, &case_arena)},
@@ -376,6 +378,7 @@ void test_check_unit(void *case_idx_opaque) {
         {"1 lb -> in", unit_new_unknown(&case_arena)},
         {"2 m^2 -> cm^1", unit_new_unknown(&case_arena)},
         {"2 km s^-1 -> kg h^-1", unit_new_unknown(&case_arena)},
+        {"1 kg * 2 kg ^ -3 km", unit_new((UnitType[]){UNIT_KILOGRAM, UNIT_KILOMETER}, (int[]){-2, 1}, 2, &case_arena)},
     };
     const size_t num_cases = sizeof(cases) / sizeof(CheckUnitCase);
     bool all_passed = true;
@@ -418,7 +421,6 @@ void test_evaluate(void *case_idx_opaque) {
         // Order of operations
         {"1 + 2 * 3", 7},
         {"2 / 4 + 1", 1.5},
-        // Everything
         {" 3000  - 600 * 20 / 2.5 +\t20", -1780},
         // Units
         {"2 cm * 3 + 1.5cm", 7.5},
