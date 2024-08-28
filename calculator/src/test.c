@@ -425,6 +425,7 @@ void test_evaluate(void *case_idx_opaque) {
         {" 3000  - 600 * 20 / 2.5 +\t20", -1780},
         // Units
         {"2 cm * 3 + 1.5cm", 7.5},
+        {"km ^ 2 h lb^-3", 0},
         // Conversions
         {"1 km * 3 -> in", 118110.236100},
         {"2 s + 3 h - 6 min -> min", (2.0 + 3 * 3600 - 6 * 60) / 60},

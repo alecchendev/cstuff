@@ -146,14 +146,14 @@ double evaluate(Expression expr, Arena *arena) {
     switch (expr.type) {
         case EXPR_CONSTANT:
             return expr.expr.constant;
+        case EXPR_POW: // Pow only means unit degrees for now
         case EXPR_UNIT:
+        case EXPR_COMP_UNIT:
             return 0;
         case EXPR_NEG:
             return -evaluate(*expr.expr.unary_expr.right, arena);
         case EXPR_CONST_UNIT:
             return evaluate(*expr.expr.binary_expr.left, arena);
-        case EXPR_COMP_UNIT:
-            return 0;
         case EXPR_ADD: case EXPR_SUB: case EXPR_MUL: case EXPR_DIV:
             left_unit = check_unit(*expr.expr.binary_expr.left, arena);
             right_unit = check_unit(*expr.expr.binary_expr.right, arena);
@@ -167,7 +167,6 @@ double evaluate(Expression expr, Arena *arena) {
             right_unit = check_unit(*expr.expr.binary_expr.right, arena);
             left = evaluate(*expr.expr.binary_expr.left, arena);
             return left * unit_convert_factor(left_unit, right_unit, arena);
-        case EXPR_POW: // Pow only means unit degrees for now
         case EXPR_EMPTY: case EXPR_QUIT: case EXPR_HELP: case EXPR_INVALID:
             assert(false);
             return 0;
