@@ -79,10 +79,6 @@ Unit check_unit(Expression expr, Arena *arena) {
     debug("left: %s, right: %s\n", display_unit(left, arena), display_unit(right, arena));
 
     if (expr.type == EXPR_CONVERT) {
-        if (is_unit_none(left) || is_unit_none(right)) {
-            printf("Cannot convert to or from no unit\n");
-            return unit_new_unknown(arena);
-        }
         if (is_unit_unknown(left) || is_unit_unknown(right)) {
             printf("Cannot convert to or from unknown unit\n");
             return unit_new_unknown(arena);
@@ -105,18 +101,23 @@ Unit check_unit(Expression expr, Arena *arena) {
     }
 
     Unit unit = unit_new_unknown(arena);
-    if (is_unit_none(left)) {
+    if (is_unit_unknown(left) || is_unit_unknown(right)) {
+        // Case to make sure we don't print our error message again
+        debug("unit unknown\n");
+        unit = unit_new_unknown(arena);
+    } else if (expr.type == EXPR_ADD || expr.type == EXPR_SUB) {
+        if (unit_convert_valid(right, left, arena)) {
+            debug("units convertible for add/sub\n");
+            unit = left;
+        } else {
+            debug("units not convertible for add/sub\n");
+            unit = unit_new_unknown(arena);
+        }
+    } else if (is_unit_none(left)) {
         debug("unit left none\n");
         unit = right;
     } else if (is_unit_none(right)) {
         debug("unit right none\n");
-        unit = left;
-    } else if (is_unit_unknown(left) || is_unit_unknown(right)) {
-        // Case to make sure we don't print our error message again
-        debug("unit unknown\n");
-        unit = unit_new_unknown(arena);
-    } else if ((expr.type == EXPR_ADD || expr.type == EXPR_SUB) && unit_convert_valid(right, left, arena)) {
-        debug("units convertible for add/sub\n");
         unit = left;
     } else if (expr.type == EXPR_MUL) {
         debug("combining units for mul\n");

@@ -320,6 +320,7 @@ void test_invalid_expr(void *case_idx_opaque) {
     Arena case_arena = arena_create();
     InvalidExprCase cases[] = {
         {"1 +"},
+        {"1 -> "},
     };
     const size_t num_cases = sizeof(cases) / sizeof(InvalidExprCase);
     bool all_passed = true;
@@ -377,6 +378,8 @@ void test_check_unit(void *case_idx_opaque) {
         {"2 m^2 -> cm^1", unit_new_unknown(&case_arena)},
         {"2 km s^-1 -> kg h^-1", unit_new_unknown(&case_arena)},
         {"1 kg * 2 kg ^ -3 km", unit_new((UnitType[]){UNIT_KILOGRAM, UNIT_KILOMETER}, (int[]){-2, 1}, 2, &case_arena)},
+        {"1 km + 1", unit_new_unknown(&case_arena)},
+        {"1 -> km", unit_new_unknown(&case_arena)},
     };
     const size_t num_cases = sizeof(cases) / sizeof(CheckUnitCase);
     bool all_passed = true;
@@ -425,7 +428,7 @@ void test_evaluate(void *case_idx_opaque) {
         // Conversions
         {"1 km * 3 -> in", 118110.236100},
         {"2 s + 3 h - 6 min -> min", (2.0 + 3 * 3600 - 6 * 60) / 60},
-        {"2 s + 3 h / 6 min -> min", (2 + 3.0 / (6.0 / 60)) / 60},
+        {"2 s + 3 h^2 / 6 min -> min", (2 + 3.0 / (6.0 / 60) * 3600) / 60},
         {"6 min / 2 min * 3 s -> s", 6.0 / 2 * (3.0 / 60) * 60},
         {"6 min * 2 min * 3 s -> s^3", 6.0 * 2 * (3.0 / 60) * 60 * 60 * 60},
         // Compositve conversions

@@ -150,10 +150,11 @@ Unit unit_new_unknown(Arena *arena) {
 #define MAX_COMPOSITE_UNIT_STRING MAX_UNITS_DISPLAY * MAX_UNIT_WITH_DEGREE_STRING
 
 char *display_unit(Unit unit, Arena *arena) {
-    if (unit.length == 0 || (unit.length == 1 && unit.types[0] == UNIT_NONE)) {
+    assert(unit.length > 0);
+    if (is_unit_none(unit)) {
         return "none";
     }
-    if (unit.length == 1 && unit.types[0] == UNIT_UNKNOWN) {
+    if (is_unit_unknown(unit)) {
         return "unknown";
     }
     char *str = arena_alloc(arena, MAX_COMPOSITE_UNIT_STRING);
@@ -199,7 +200,17 @@ bool units_equal(Unit a, Unit b, Arena *arena) {
 }
 
 bool unit_convert_valid(Unit a, Unit b, Arena *arena) {
-    if (a.length != b.length && !is_unit_none(a) && !is_unit_none(b)) {
+    if (is_unit_none(a) != is_unit_none(b)) {
+        printf("Convert invalid: one unit is none but no the other: Left: %s Right: %s\n",
+            display_unit(a, arena), display_unit(b, arena));
+        return false;
+    }
+    if (is_unit_unknown(a) || is_unit_unknown(b)) {
+        printf("Convert invalid, unknown units: Left: %s Right: %s\n",
+            display_unit(a, arena), display_unit(b, arena));
+        return false;
+    }
+    if (a.length != b.length) {
         printf("Convert invalid, lengths not equal: Expected: %zu Got: %zu\n", b.length, a.length);
         return false;
     }
