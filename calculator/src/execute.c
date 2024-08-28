@@ -8,6 +8,17 @@
 #include "tokenize.c"
 #include "arena.c"
 
+// TODO: more math, everything relating to a stored memory
+const char help_msg[] = "Hello! Here's some stuff you can do:\n\
+Math: 1 + 2 * 3 - 4 / 5\n\
+More math: TODO pow, log, parentheses\n\
+Math with units: 1km/2s*3km+4km^2s^-1\n\
+Convert units: 10 m/s^2 -> km/h^2\n\
+Auto-convert units: 10 km - 2 m + 12 mi\n\
+Variables: x = 9 + 10\n\
+Custom units: 1 pentameter -> 5 m\n\
+Unit aliases: n = kg m s^-2";
+
 bool execute_line(const char *input, char *output, size_t output_len) {
     Arena arena = arena_create();
     TokenString tokens = tokenize(input, &arena);
@@ -20,6 +31,8 @@ bool execute_line(const char *input, char *output, size_t output_len) {
         memcpy(output, invalid_str, sizeof(invalid_str));
     } else if (expr.type == EXPR_EMPTY) {
         memset(output, 0, output_len);
+    } else if (expr.type == EXPR_HELP) {
+        memcpy(output, help_msg, sizeof(help_msg));
     } else if (expr.type == EXPR_QUIT) {
         memset(output, 0, output_len);
         quit = true;
@@ -199,7 +212,7 @@ void repl(FILE *input_fd) {
         if (input.len == 0) {
             continue;
         }
-        char output[256] = {0};
+        char output[512] = {0};
         done = execute_line(input.data, output, sizeof(output));
         if (strnlen(output, sizeof(output)) > 0) printf("%s\n", output);
 

@@ -38,6 +38,7 @@ typedef enum {
     EXPR_POW,
     EXPR_EMPTY,
     EXPR_QUIT,
+    EXPR_HELP,
     EXPR_INVALID,
 } ExprType;
 
@@ -123,6 +124,7 @@ bool left_associative(TokenType op, size_t idx, bool prev_is_bin_op) {
 
 const Expression empty_expr = { .type = EXPR_EMPTY };
 const Expression quit_expr = { .type = EXPR_QUIT };
+const Expression help_expr = { .type = EXPR_HELP };
 const Expression invalid_expr = { .type = EXPR_INVALID };
 
 Expression parse(TokenString tokens, Arena *arena) {
@@ -140,6 +142,10 @@ Expression parse(TokenString tokens, Arena *arena) {
     if (tokens.length == 1 && tokens.tokens[0].type == TOK_QUIT) {
         debug("quit\n");
         return quit_expr;
+    }
+    if (tokens.length == 1 && tokens.tokens[0].type == TOK_HELP) {
+        debug("help\n");
+        return help_expr;
     }
     if (tokens.length == 1 && tokens.tokens[0].type == TOK_UNIT) {
         debug("unit\n");
@@ -255,6 +261,8 @@ void display_expr(size_t offset, Expression expr, Arena *arena) {
         debug("quit\n");
     } else if (expr.type == EXPR_INVALID) {
         debug("invalid\n");
+    } else if (expr.type == EXPR_HELP) {
+        debug("help\n");
     } else {
         assert(expr.expr.binary_expr.left != NULL);
         assert(expr.expr.binary_expr.right != NULL);

@@ -24,8 +24,7 @@ bool check_valid_expr(Expression expr) {
             left_valid = check_valid_expr(*expr.expr.binary_expr.left);
             right_valid = check_valid_expr(*expr.expr.binary_expr.right);
             break;
-        case EXPR_EMPTY:
-        case EXPR_QUIT:
+        case EXPR_EMPTY: case EXPR_QUIT: case EXPR_HELP:
             return true;
         case EXPR_INVALID:
             return false;
@@ -168,9 +167,7 @@ double evaluate(Expression expr, Arena *arena) {
             left = evaluate(*expr.expr.binary_expr.left, arena);
             return left * unit_convert_factor(left_unit, right_unit, arena);
         case EXPR_POW: // Pow only means unit degrees for now
-        case EXPR_EMPTY:
-        case EXPR_QUIT:
-        case EXPR_INVALID:
+        case EXPR_EMPTY: case EXPR_QUIT: case EXPR_HELP: case EXPR_INVALID:
             assert(false);
             return 0;
     }

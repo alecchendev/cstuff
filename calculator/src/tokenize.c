@@ -18,6 +18,7 @@ enum TokenType {
     TOK_DIV,
     TOK_CARET,
     TOK_WHITESPACE,
+    TOK_HELP,
     TOK_QUIT,
     TOK_END,
     TOK_INVALID,
@@ -57,6 +58,7 @@ const Token invalid_token = {TOK_INVALID};
 const Token end_token = {TOK_END};
 const Token quit_token = {TOK_QUIT};
 const Token whitespace_token = {TOK_WHITESPACE};
+const Token help_token = {TOK_HELP};
 const Token add_token = {TOK_ADD};
 const Token sub_token = {TOK_SUB};
 const Token mul_token = {TOK_MUL};
@@ -95,6 +97,9 @@ Token next_token(const char *input, size_t *pos, size_t length) {
             && (strncmp(string_token, "quit", 4) == 0
                 || strncmp(string_token, "exit", 4) == 0)) {
             return quit_token;
+        }
+        if (strnlen(string_token, 5) == 4 && strncmp(string_token, "help", 4) == 0) {
+            return help_token;
         }
         for (size_t unit = 0; unit < UNIT_COUNT; unit++) {
             const char *unit_str = unit_strings[unit];

@@ -188,9 +188,7 @@ bool exprs_equal(Expression a, Expression b, Arena *arena) {
             if (!exprs_equal(*a.expr.binary_expr.right, *b.expr.binary_expr.right, arena)) {
                 return false;
             }
-        case EXPR_EMPTY:
-        case EXPR_QUIT:
-        case EXPR_INVALID:
+        case EXPR_EMPTY: case EXPR_QUIT: case EXPR_HELP: case EXPR_INVALID:
             return true;
     }
 }
