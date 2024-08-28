@@ -14,7 +14,8 @@
     <style>
         body {
             margin: auto;
-            max-width: 800px;
+            width: 800px;
+            max-width: 90%;
             font-size: 2rem;
         }
         h1 {
@@ -33,6 +34,7 @@
           color: #646669;
         }
         #inputBox {
+            caret-color: #e2b714;
             color: #d1d0c5;
             background-color: #2C2E31;
             font-family: 'Roboto Mono', monospace;
@@ -66,7 +68,7 @@
     <div id="history"></div>
 
 
-    <textarea id="inputBox" placeholder="type an expression to calculate or 'help' to see options" autofocus></textarea>
+    <textarea id="inputBox" placeholder="type an expression to calculate, 'help' to see options, or 'clear'" autofocus></textarea>
 
     <script>
         // Array to keep track of input-output history
@@ -97,6 +99,8 @@
             // Convert the output buffer to a JavaScript string (assuming null-terminated output)
             const processedOutput = new TextDecoder('utf-8').decode(outputBuffer.subarray(0, outputBuffer.indexOf(0)));
 
+            console.log(processedOutput);
+
             // -----------------------------
 
             // Store input and output in history
@@ -122,8 +126,8 @@
             history.forEach(item => {
                 const div = document.createElement('div');
                 div.classList.add('history-item');
-                div.innerHTML = `<span class="input">${item.input}</span><br>
-                                 <span class="output">${item.output}</span>`;
+                div.innerHTML = `<span class="input">${item.input.replaceAll('\n', '<br>')}</span><br>
+                                 <span class="output">${item.output.replaceAll('\n', '<br>')}</span>`;
                 historyElement.appendChild(div);
             });
 
