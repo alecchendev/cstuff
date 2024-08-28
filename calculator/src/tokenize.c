@@ -75,10 +75,11 @@ Token token_new_unit(UnitType unit) {
 // TODO: make this more generic where I can simply define
 // basically a table of strings and their corresponding tokens
 Token next_token(const char *input, size_t *pos, size_t length) {
-    const unsigned char end[2] = {'\0', '\n'};
-    if (*pos >= length || char_in_set(input[*pos], end, 2)) {
-        debug("Invalid end of input, next: %c\n", input[*pos+1]);
-        if (*pos != length) return invalid_token;
+    if (*pos >= length || input[*pos] == '\0') {
+        if (*pos != length) {
+            debug("Invalid end of input, next: %c\n", input[*pos+1]);
+            return invalid_token;
+        }
         debug("End of input, next: %c\n", input[*pos+1]);
         return end_token;
     }
@@ -106,17 +107,17 @@ Token next_token(const char *input, size_t *pos, size_t length) {
         return invalid_token;
     }
 
-    const unsigned char whitespace[2] = {' ', '\t'};
-    if (char_in_set(input[*pos], whitespace, 2)) {
+    const unsigned char whitespace[3] = {' ', '\t', '\n'};
+    if (char_in_set(input[*pos], whitespace, sizeof(whitespace))) {
         debug("Whitespace, next: %c\n", input[*pos+1]);
-        while (char_in_set(input[*pos], whitespace, 2)) {
+        while (char_in_set(input[*pos], whitespace, sizeof(whitespace))) {
             (*pos)++;
         }
         return whitespace_token;
     }
 
     const unsigned char operators[5] = {'+', '-', '*', '/', '^'};
-    if (char_in_set(input[*pos], operators, 5)) {
+    if (char_in_set(input[*pos], operators, sizeof(operators))) {
         debug("Operator: %c\n", input[*pos]);
         Token token = invalid_token;
         if (input[*pos] == '+') {
