@@ -50,8 +50,7 @@ const char *unit_strings[] = {
     "kg",
     "lb",
     "oz",
-
-    "none",
+    "none", // TODO: make blank for release
     "",
     "unknown",
 };

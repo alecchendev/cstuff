@@ -181,7 +181,7 @@ bool exprs_equal(Expression a, Expression b, Arena *arena) {
             return exprs_equal(*a.expr.unary_expr.right, *b.expr.unary_expr.right, arena);
         case EXPR_CONST_UNIT: case EXPR_COMP_UNIT:
         case EXPR_ADD: case EXPR_SUB: case EXPR_MUL: case EXPR_DIV:
-        case EXPR_CONVERT: case EXPR_POW:
+        case EXPR_CONVERT: case EXPR_POW: case EXPR_DIV_UNIT:
             if (!exprs_equal(*a.expr.binary_expr.left, *b.expr.binary_expr.left, arena)) {
                 return false;
             }
@@ -380,6 +380,11 @@ void test_check_unit(void *case_idx_opaque) {
         {"1 kg * 2 kg ^ -3 km", unit_new((UnitType[]){UNIT_KILOGRAM, UNIT_KILOMETER}, (int[]){-2, 1}, 2, &case_arena)},
         {"1 km + 1", unit_new_unknown(&case_arena)},
         {"1 -> km", unit_new_unknown(&case_arena)},
+        {"1 m / s", unit_new((UnitType[]){UNIT_METER, UNIT_SECOND}, (int[]){1, -1}, 2, &case_arena)},
+        {"1 m^2 / s^2 kg^2", unit_new((UnitType[]){UNIT_METER, UNIT_SECOND, UNIT_KILOGRAM},
+            (int[]){2, -2, -2}, 3, &case_arena)},
+        {"1 m^2 s^3 / kg^2", unit_new((UnitType[]){UNIT_METER, UNIT_SECOND, UNIT_KILOGRAM},
+            (int[]){2, 3, -2}, 3, &case_arena)}
     };
     const size_t num_cases = sizeof(cases) / sizeof(CheckUnitCase);
     bool all_passed = true;
@@ -426,6 +431,7 @@ void test_evaluate(void *case_idx_opaque) {
         // Units
         {"2 cm * 3 + 1.5cm", 7.5},
         {"km ^ 2 h lb^-3", 0},
+        {"1 m / s + 2 km / h", 1 + 2.0 * 1000 / 3600},
         // Conversions
         {"1 km * 3 -> in", 118110.236100},
         {"2 s + 3 h - 6 min -> min", (2.0 + 3 * 3600 - 6 * 60) / 60},

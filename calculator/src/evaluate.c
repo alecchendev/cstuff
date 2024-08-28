@@ -17,7 +17,7 @@ bool check_valid_expr(Expression expr) {
             right_type = expr.expr.unary_expr.right->type;
             return right_type == EXPR_CONSTANT || right_type == EXPR_NEG || right_type == EXPR_CONST_UNIT;
         case EXPR_CONST_UNIT: case EXPR_COMP_UNIT: case EXPR_ADD: case EXPR_SUB:
-        case EXPR_MUL: case EXPR_DIV: case EXPR_CONVERT: case EXPR_POW:
+        case EXPR_MUL: case EXPR_DIV: case EXPR_CONVERT: case EXPR_POW: case EXPR_DIV_UNIT:
             left_type = expr.expr.binary_expr.left->type;
             right_type = expr.expr.binary_expr.right->type;
             debug("curr: %d left: %d right: %d\n", expr.type, left_type, right_type);
@@ -29,30 +29,31 @@ bool check_valid_expr(Expression expr) {
         case EXPR_INVALID:
             return false;
     }
+    if (!left_valid || !right_valid) {
+        debug("Left or right invalid: Left: %d Right: %d\n", left_valid, right_valid);
+        return false;
+    }
+    debug("Curr type: %s Left: %s Right %s\n",
+          display_expr_op(expr.type), display_expr_op(left_type), display_expr_op(right_type));
     switch (expr.type) {
         case EXPR_CONST_UNIT:
-            return left_valid && right_valid &&
+            return
                 (left_type == EXPR_CONSTANT || left_type == EXPR_NEG) &&
-                (right_type == EXPR_UNIT || right_type == EXPR_COMP_UNIT || right_type == EXPR_POW);
+                (expr_is_unit(right_type));
+        case EXPR_DIV_UNIT:
+            return expr_is_unit(left_type) && expr_is_unit(right_type);
         case EXPR_COMP_UNIT:
-            return left_valid && right_valid &&
-                (left_type == EXPR_UNIT || left_type == EXPR_COMP_UNIT || left_type == EXPR_POW) &&
+            return
+                (expr_is_unit(left_type)) &&
                 (right_type == EXPR_UNIT || right_type == EXPR_POW);
         case EXPR_ADD: case EXPR_SUB: case EXPR_MUL: case EXPR_DIV:
-            return left_valid && right_valid &&
-                (left_type == EXPR_CONSTANT || left_type == EXPR_CONST_UNIT ||
-                 left_type == EXPR_NEG || left_type == EXPR_ADD || left_type == EXPR_SUB ||
-                 left_type == EXPR_MUL || left_type == EXPR_DIV) &&
-                (right_type == EXPR_CONSTANT || right_type == EXPR_CONST_UNIT ||
-                 right_type == EXPR_NEG || right_type == EXPR_ADD || right_type == EXPR_SUB ||
-                 right_type == EXPR_MUL || right_type == EXPR_DIV);
+            return
+                (expr_is_number(left_type) && expr_is_number(right_type)) ||
+                (expr.type == EXPR_DIV && expr_is_unit(left_type) && expr_is_unit(right_type));
         case EXPR_CONVERT:
-            return left_valid && right_valid &&
-                (right_type == EXPR_UNIT || right_type == EXPR_COMP_UNIT || right_type == EXPR_POW);
+            return expr_is_number(left_type) && expr_is_unit(right_type);
         case EXPR_POW:
-            return left_valid && right_valid &&
-                (left_type == EXPR_UNIT || left_type == EXPR_COMP_UNIT || left_type == EXPR_POW) &&
-                (right_type == EXPR_CONSTANT || right_type == EXPR_NEG);
+            return expr_is_unit(left_type) && (right_type == EXPR_CONSTANT || right_type == EXPR_NEG);
         default:
             assert(false);
             return false;
@@ -125,7 +126,7 @@ Unit check_unit(Expression expr, Arena *arena) {
     } else if (expr.type == EXPR_COMP_UNIT) {
         debug("combining units for comp\n");
         unit = unit_combine(left, right, true, arena);
-    } else if (expr.type == EXPR_DIV) {
+    } else if (expr.type == EXPR_DIV || expr.type == EXPR_DIV_UNIT) {
         debug("dividing units\n");
         for (size_t i = 0; i < right.length; i++) {
             right.degrees[i] *= -1;
@@ -149,6 +150,7 @@ double evaluate(Expression expr, Arena *arena) {
         case EXPR_POW: // Pow only means unit degrees for now
         case EXPR_UNIT:
         case EXPR_COMP_UNIT:
+        case EXPR_DIV_UNIT:
             return 0;
         case EXPR_NEG:
             return -evaluate(*expr.expr.unary_expr.right, arena);

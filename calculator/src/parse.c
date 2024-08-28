@@ -30,6 +30,7 @@ typedef enum {
     EXPR_NEG,
     EXPR_CONST_UNIT,
     EXPR_COMP_UNIT,
+    EXPR_DIV_UNIT,
     EXPR_ADD,
     EXPR_SUB,
     EXPR_MUL,
@@ -93,17 +94,41 @@ bool is_bin_op(TokenType type) {
             type == TOK_DIV || type == TOK_CARET || type == TOK_CONVERT;
 }
 
+bool expr_is_unit(ExprType type) {
+    switch (type) {
+        case EXPR_UNIT: case EXPR_COMP_UNIT: case EXPR_POW: case EXPR_DIV_UNIT:
+            return true;
+        case EXPR_CONSTANT: case EXPR_NEG: case EXPR_CONST_UNIT:
+        case EXPR_ADD: case EXPR_SUB: case EXPR_MUL: case EXPR_DIV: case EXPR_CONVERT:
+        case EXPR_EMPTY: case EXPR_QUIT: case EXPR_HELP: case EXPR_INVALID:
+            return false;
+    }
+}
+
+bool expr_is_number(ExprType type) {
+    switch (type) {
+        case EXPR_CONSTANT: case EXPR_NEG: case EXPR_CONST_UNIT:
+        case EXPR_ADD: case EXPR_SUB: case EXPR_MUL: case EXPR_DIV: case EXPR_CONVERT:
+            return true;
+        case EXPR_UNIT: case EXPR_COMP_UNIT: case EXPR_POW: case EXPR_DIV_UNIT:
+        case EXPR_EMPTY: case EXPR_QUIT: case EXPR_HELP: case EXPR_INVALID:
+            return false;
+    }
+}
+
 // Higher number = parse this first, evaluate this last.
-int precedence(TokenType op, size_t idx, bool prev_is_bin_op) {
-    if (op == TOK_CONVERT) return 8;
-    if (op == TOK_ADD) return 7;
-    if (op == TOK_SUB && idx != 0 && !prev_is_bin_op) return 7; // Not negation
-    if (op == TOK_MUL || op == TOK_DIV) return 6;
-    if (op == TOK_SUB && !prev_is_bin_op) return 5; // Normal negation
+int precedence(TokenType op, size_t idx, bool prev_is_bin_op, bool next_is_unit) {
+    if (op == TOK_CONVERT) return 9;
+    if (op == TOK_ADD) return 8;
+    if (op == TOK_SUB && idx != 0 && !prev_is_bin_op) return 8; // Not negation
+    if (op == TOK_MUL) return 7;
+    if (op == TOK_DIV && !next_is_unit) return 7;
+    if (op == TOK_SUB && !prev_is_bin_op) return 6; // Normal negation
     // This function will only be called when we are checking
     // for tokens with length > 1, so this signals a constant
     // with something after it.
-    if (op == TOK_NUM && idx == 0) return 4;
+    if (op == TOK_NUM && idx == 0) return 5;
+    if (op == TOK_DIV) return 4;
     if (op == TOK_UNIT && idx != 0) return 3;
     if (op == TOK_CARET) return 2;
     if (op == TOK_SUB) return 1; // Negation within degree
@@ -162,15 +187,16 @@ Expression parse(TokenString tokens, Arena *arena) {
 
     // Find the thing we should parse next
     size_t op_idx = 0;
+    int best_precedence = 0;
     for (size_t i = 0; i < tokens.length; i++) {
         bool prev_is_bin_op = i == 0 ? false : is_bin_op(tokens.tokens[i - 1].type);
-        TokenType prev_best_is_bin_op = op_idx == 0 ? false : is_bin_op(tokens.tokens[op_idx - 1].type);
-        int curr_precedence = precedence(tokens.tokens[i].type, i, prev_is_bin_op);
-        int best_precedence = precedence(tokens.tokens[op_idx].type, op_idx, prev_best_is_bin_op);
+        bool next_is_unit = i == tokens.length - 1 ? false : tokens.tokens[i + 1].type == TOK_UNIT;
+        int curr_precedence = precedence(tokens.tokens[i].type, i, prev_is_bin_op, next_is_unit);
         bool curr_left_assoc = left_associative(tokens.tokens[i].type, i, prev_is_bin_op);
         if (curr_precedence > best_precedence || (curr_precedence == best_precedence && curr_left_assoc)) {
             debug("Found higher precedence: %d at idx: %zu\n", tokens.tokens[i].type, i);
             op_idx = i;
+            best_precedence = curr_precedence;
         }
     }
     TokenType op = tokens.tokens[op_idx].type;
@@ -190,8 +216,10 @@ Expression parse(TokenString tokens, Arena *arena) {
         type = EXPR_SUB;
     } else if (op == TOK_MUL) {
         type = EXPR_MUL;
-    } else if (op == TOK_DIV) {
+    } else if (op == TOK_DIV && (op_idx == tokens.length - 1 || tokens.tokens[op_idx + 1].type != TOK_UNIT)) {
         type = EXPR_DIV;
+    } else if (op == TOK_DIV) {
+        type = EXPR_DIV_UNIT;
     } else if (op == TOK_NUM) {
         type = EXPR_CONST_UNIT;
     } else if (op == TOK_UNIT) {
@@ -221,24 +249,22 @@ Expression parse(TokenString tokens, Arena *arena) {
 
 const char *display_expr_op(ExprType type) {
     switch (type) {
-        case EXPR_ADD:
-            return "+";
-        case EXPR_SUB:
-            return "-";
-        case EXPR_MUL:
-            return "*";
-        case EXPR_DIV:
-            return "/";
-        case EXPR_CONVERT:
-            return "->";
-        case EXPR_POW:
-            return "^";
-        case EXPR_CONST_UNIT:
-            return "const x unit";
-        case EXPR_COMP_UNIT:
-            return "unit x unit";
-        default:
-            return "?";
+        case EXPR_ADD: return "+";
+        case EXPR_SUB: return "-";
+        case EXPR_MUL: return "*";
+        case EXPR_DIV: return "/ num";
+        case EXPR_DIV_UNIT: return "/ unit";
+        case EXPR_CONVERT: return "->";
+        case EXPR_POW: return "^";
+        case EXPR_CONST_UNIT: return "const x unit";
+        case EXPR_COMP_UNIT: return "unit x unit";
+        case EXPR_NEG: return "negation";
+        case EXPR_CONSTANT: return "const";
+        case EXPR_UNIT: return "unit";
+        case EXPR_EMPTY: return "empty";
+        case EXPR_QUIT: return "quit";
+        case EXPR_HELP: return "help";
+        case EXPR_INVALID: return "invalid";
     }
 }
 
@@ -248,6 +274,7 @@ void display_expr(size_t offset, Expression expr, Arena *arena) {
         printf("\t");
     }
 #endif
+    // TODO: reuse display_expr_op here
     if (expr.type == EXPR_CONSTANT) {
         debug("%lf\n", expr.expr.constant);
     } else if (expr.type == EXPR_UNIT) {
