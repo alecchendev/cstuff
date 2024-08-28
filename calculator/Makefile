@@ -39,3 +39,6 @@ build-test: force
 
 test: build-test
 	build/test $(ARGS)
+
+wasm:
+	emcc src/lib.c -o lib.js -s EXPORTED_FUNCTIONS='["_exported_execute_line"]' -s EXPORTED_RUNTIME_METHODS='["ccall", "cwrap"]'
