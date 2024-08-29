@@ -204,7 +204,8 @@ void test_parse_case(void *c_opaque) {
     debug("Got:\n");
     display_expr(0, expr, &arena);
     assert(exprs_equal(expr, c->expected, &arena));
-    assert(check_valid_expr(expr));
+    ErrorString err = err_empty();
+    assert(check_valid_expr(expr, &err, &arena));
     arena_free(&arena);
 }
 
@@ -312,7 +313,8 @@ void test_invalid_expr_case(void *c_opaque) {
     Arena arena = arena_create();
     TokenString tokens = tokenize(c->input, &arena);
     Expression expr = parse(tokens, &arena);
-    assert(!check_valid_expr(expr));
+    ErrorString err = err_empty();
+    assert(!check_valid_expr(expr, &err, &arena));
     arena_free(&arena);
 }
 
@@ -321,6 +323,16 @@ void test_invalid_expr(void *case_idx_opaque) {
     InvalidExprCase cases[] = {
         {"1 +"},
         {"1 -> "},
+        {"- +"},
+        {"* / ^"},
+        {" -> km"},
+        {"1 + asdf"},
+        {"1 asdf 2"},
+        {"1 km ^ asdf 2 km"},
+        {"asdf"},
+        {"asdf asdf"},
+        {"asdf asdf asdf"},
+        {"asdf asdf asdf asdf"},
     };
     const size_t num_cases = sizeof(cases) / sizeof(InvalidExprCase);
     bool all_passed = true;
@@ -344,7 +356,8 @@ void test_check_unit_case(void *c_opaque) {
     TokenString tokens = tokenize(c->input, &arena);
     Expression expr = parse(tokens, &arena);
     display_expr(0, expr, &arena);
-    assert(check_valid_expr(expr));
+    ErrorString err = err_empty();
+    assert(check_valid_expr(expr, &err, &arena));
     Unit unit = check_unit(expr, &arena);
     assert(units_equal(unit, c->expected, &arena));
     arena_free(&arena);
@@ -408,7 +421,8 @@ void test_evaluate_case(void *c_opaque) {
     Arena arena = arena_create();
     TokenString tokens = tokenize(c->input, &arena);
     Expression expr = parse(tokens, &arena);
-    assert(check_valid_expr(expr));
+    ErrorString err = err_empty();
+    assert(check_valid_expr(expr, &err, &arena));
     assert(!is_unit_unknown(check_unit(expr, &arena)));
     double result = evaluate(expr, &arena);
     debug("Expected: %f, got: %f\n", c->expected, result);

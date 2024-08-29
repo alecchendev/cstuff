@@ -2,10 +2,37 @@
 
 #include "parse.c"
 #include "unit.c"
+#include <stdio.h>
 
 double evaluate(Expression expr, Arena *arena);
 
-bool check_valid_expr(Expression expr) {
+typedef struct ErrorString ErrorString;
+struct ErrorString {
+    char *msg;
+    size_t len;
+};
+
+ErrorString err_empty() {
+    return (ErrorString) { .msg = NULL, .len = 0 };
+}
+
+// While these are helpful sometimes,
+// there are cases where the error requires
+// more knowledge of our parse tree. E.g. "1 / km".
+// Not sure the best way to communicate things
+// like this. TODO: show user the block of tokens
+// where they messed up, and it'll probably be
+// obvious.
+const char invalid_token_msg[] = "Invalid token";
+const char invalid_neg_msg[] = "Negation expected right side to be constant, negation, or constant with unit, instead got: %s";
+const char invalid_const_unit_msg[] = "Expected to combine constant with unit, instead got left: %s right: %s";
+const char invalid_div_unit_msg[] = "Expected to divide two units, instead got left: %s right: %s";
+const char invalid_comp_unit_msg[] = "Expected to combine two units, instead got left: %s right: %s";
+const char invalid_math_msg[] = "Expected to %s two numbers, instead got left: %s right: %s";
+const char invalid_pow_msg[] = "Expected to raise unit to degree, instead got left: %s right: %s";
+
+bool check_valid_expr(Expression expr, ErrorString *err, Arena *arena) {
+    if (err->len > 0) return false;
     bool left_valid = false;
     bool right_valid = false;
     ExprType left_type = EXPR_INVALID;
@@ -15,18 +42,27 @@ bool check_valid_expr(Expression expr) {
             return true;
         case EXPR_NEG:
             right_type = expr.expr.unary_expr.right->type;
-            return right_type == EXPR_CONSTANT || right_type == EXPR_NEG || right_type == EXPR_CONST_UNIT;
+            if (right_type == EXPR_CONSTANT || right_type == EXPR_NEG || right_type == EXPR_CONST_UNIT) {
+                return true;
+            }
+            err->len = sizeof(invalid_neg_msg) + EXPR_OP_MAX;
+            err->msg = arena_alloc(arena, err->len);
+            snprintf(err->msg, err->len, invalid_neg_msg, display_expr_op(right_type));
+            return false;
         case EXPR_CONST_UNIT: case EXPR_COMP_UNIT: case EXPR_ADD: case EXPR_SUB:
         case EXPR_MUL: case EXPR_DIV: case EXPR_CONVERT: case EXPR_POW: case EXPR_DIV_UNIT:
             left_type = expr.expr.binary_expr.left->type;
             right_type = expr.expr.binary_expr.right->type;
             debug("curr: %d left: %d right: %d\n", expr.type, left_type, right_type);
-            left_valid = check_valid_expr(*expr.expr.binary_expr.left);
-            right_valid = check_valid_expr(*expr.expr.binary_expr.right);
+            left_valid = check_valid_expr(*expr.expr.binary_expr.left, err, arena);
+            right_valid = check_valid_expr(*expr.expr.binary_expr.right, err, arena);
             break;
         case EXPR_EMPTY: case EXPR_QUIT: case EXPR_HELP:
             return true;
         case EXPR_INVALID:
+            err->len = sizeof(invalid_token_msg);
+            err->msg = arena_alloc(arena, err->len);
+            memcpy(err->msg, invalid_token_msg, err->len); // TODO: print actual token
             return false;
     }
     if (!left_valid || !right_valid) {
@@ -37,23 +73,62 @@ bool check_valid_expr(Expression expr) {
           display_expr_op(expr.type), display_expr_op(left_type), display_expr_op(right_type));
     switch (expr.type) {
         case EXPR_CONST_UNIT:
-            return
-                (left_type == EXPR_CONSTANT || left_type == EXPR_NEG) &&
-                (expr_is_unit(right_type));
+            if ((left_type == EXPR_CONSTANT || left_type == EXPR_NEG) &&
+                (expr_is_unit(right_type))) {
+                return true;
+            }
+            err->len = sizeof(invalid_const_unit_msg) + 2 * EXPR_OP_MAX;
+            err->msg = arena_alloc(arena, err->len);
+            snprintf(err->msg, err->len, invalid_const_unit_msg,
+                display_expr_op(left_type), display_expr_op(right_type));
+            return false;
         case EXPR_DIV_UNIT:
-            return expr_is_unit(left_type) && expr_is_unit(right_type);
+            if (expr_is_unit(left_type) && expr_is_unit(right_type)) {
+                return true;
+            }
+            err->len = sizeof(invalid_div_unit_msg) + 2 * EXPR_OP_MAX;
+            err->msg = arena_alloc(arena, err->len);
+            snprintf(err->msg, err->len, invalid_div_unit_msg,
+                display_expr_op(left_type), display_expr_op(right_type));
+            return false;
         case EXPR_COMP_UNIT:
-            return
-                (expr_is_unit(left_type)) &&
-                (right_type == EXPR_UNIT || right_type == EXPR_POW);
+            if ((expr_is_unit(left_type)) &&
+                (right_type == EXPR_UNIT || right_type == EXPR_POW)) {
+                return true;
+            }
+            err->len = sizeof(invalid_comp_unit_msg) + 2 * EXPR_OP_MAX;
+            err->msg = arena_alloc(arena, err->len);
+            snprintf(err->msg, err->len, invalid_comp_unit_msg,
+                display_expr_op(left_type), display_expr_op(right_type));
+            return false;
         case EXPR_ADD: case EXPR_SUB: case EXPR_MUL: case EXPR_DIV:
-            return
-                (expr_is_number(left_type) && expr_is_number(right_type)) ||
-                (expr.type == EXPR_DIV && expr_is_unit(left_type) && expr_is_unit(right_type));
+            if ((expr_is_number(left_type) && expr_is_number(right_type)) ||
+                (expr.type == EXPR_DIV && expr_is_unit(left_type) && expr_is_unit(right_type))) {
+                return true;
+            }
+            err->len = sizeof(invalid_math_msg) + 2 * EXPR_OP_MAX;
+            err->msg = arena_alloc(arena, err->len);
+            snprintf(err->msg, err->len, invalid_math_msg, display_expr_op(expr.type),
+                display_expr_op(left_type), display_expr_op(right_type));
+            return false;
         case EXPR_CONVERT:
-            return expr_is_number(left_type) && expr_is_unit(right_type);
+            if (expr_is_number(left_type) && expr_is_unit(right_type)) {
+                return true;
+            }
+            err->len = sizeof(invalid_math_msg) + 2 * EXPR_OP_MAX;
+            err->msg = arena_alloc(arena, err->len);
+            snprintf(err->msg, err->len, invalid_math_msg, display_expr_op(expr.type),
+                display_expr_op(left_type), display_expr_op(right_type));
+            return false;
         case EXPR_POW:
-            return expr_is_unit(left_type) && (right_type == EXPR_CONSTANT || right_type == EXPR_NEG);
+            if (expr_is_unit(left_type) && (right_type == EXPR_CONSTANT || right_type == EXPR_NEG)) {
+                return true;
+            }
+            err->len = sizeof(invalid_pow_msg) + 2 * EXPR_OP_MAX;
+            err->msg = arena_alloc(arena, err->len);
+            snprintf(err->msg, err->len, invalid_pow_msg,
+                display_expr_op(left_type), display_expr_op(right_type));
+            return false;
         default:
             assert(false);
             return false;

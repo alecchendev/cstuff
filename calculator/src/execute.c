@@ -25,10 +25,10 @@ bool execute_line(const char *input, char *output, size_t output_len) {
     Expression expr = parse(tokens, &arena);
     display_expr(0, expr, &arena);
     bool quit = false;
-    if (!check_valid_expr(expr)) {
+    ErrorString err = err_empty();
+    if (!check_valid_expr(expr, &err, &arena)) {
         // TODO: make this more helpful
-        const char invalid_str[] = "Invalid expression";
-        memcpy(output, invalid_str, sizeof(invalid_str));
+        memcpy(output, err.msg, err.len);
     } else if (expr.type == EXPR_EMPTY) {
         memset(output, 0, output_len);
     } else if (expr.type == EXPR_HELP) {

@@ -152,6 +152,8 @@ const Expression quit_expr = { .type = EXPR_QUIT };
 const Expression help_expr = { .type = EXPR_HELP };
 const Expression invalid_expr = { .type = EXPR_INVALID };
 
+// Only time this should return EXPR_INVALID
+// is if we've run into an invalid token
 Expression parse(TokenString tokens, Arena *arena) {
     debug("Parsing expression\n");
     for (size_t i = 0; i < tokens.length; i++) {
@@ -247,13 +249,15 @@ Expression parse(TokenString tokens, Arena *arena) {
     return expr_new_bin(type, left, right, arena);
 }
 
+#define EXPR_OP_MAX 13
+
 const char *display_expr_op(ExprType type) {
     switch (type) {
         case EXPR_ADD: return "+";
         case EXPR_SUB: return "-";
         case EXPR_MUL: return "*";
-        case EXPR_DIV: return "/ num";
-        case EXPR_DIV_UNIT: return "/ unit";
+        case EXPR_DIV: return "/";
+        case EXPR_DIV_UNIT: return "div unit";
         case EXPR_CONVERT: return "->";
         case EXPR_POW: return "^";
         case EXPR_CONST_UNIT: return "const x unit";
