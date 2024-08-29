@@ -1,6 +1,7 @@
 
 #include <ctype.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 #include <termios.h>
 #include "evaluate.c"
@@ -27,7 +28,6 @@ bool execute_line(const char *input, char *output, size_t output_len) {
     bool quit = false;
     ErrorString err = err_empty();
     if (!check_valid_expr(expr, &err, &arena)) {
-        // TODO: make this more helpful
         memcpy(output, err.msg, err.len);
     } else if (expr.type == EXPR_EMPTY) {
         memset(output, 0, output_len);
@@ -37,8 +37,10 @@ bool execute_line(const char *input, char *output, size_t output_len) {
         memset(output, 0, output_len);
         quit = true;
     } else {
-        Unit unit = check_unit(expr, &arena);
-        if (!is_unit_unknown(unit)) {
+        Unit unit = check_unit(expr, &err, &arena);
+        if (is_unit_unknown(unit)) {
+            memcpy(output, err.msg, err.len);
+        } else {
             double result = evaluate(expr, &arena);
             snprintf(output, output_len, "%lf %s", result, display_unit(unit, &arena));
         }

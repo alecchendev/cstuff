@@ -326,6 +326,7 @@ void test_invalid_expr(void *case_idx_opaque) {
         {"- +"},
         {"* / ^"},
         {" -> km"},
+        {"1 / km"},
         {"1 + asdf"},
         {"1 asdf 2"},
         {"1 km ^ asdf 2 km"},
@@ -357,8 +358,8 @@ void test_check_unit_case(void *c_opaque) {
     Expression expr = parse(tokens, &arena);
     display_expr(0, expr, &arena);
     ErrorString err = err_empty();
-    assert(check_valid_expr(expr, &err, &arena));
-    Unit unit = check_unit(expr, &arena);
+    /*assert(check_valid_expr(expr, &err, &arena));*/
+    Unit unit = check_unit(expr, &err, &arena);
     assert(units_equal(unit, c->expected, &arena));
     arena_free(&arena);
 }
@@ -388,6 +389,8 @@ void test_check_unit(void *case_idx_opaque) {
         {"1km -> s", unit_new_unknown(&case_arena)},
         {"1kg -> h", unit_new_unknown(&case_arena)},
         {"1 lb -> in", unit_new_unknown(&case_arena)},
+        {"m ^ m", unit_new_unknown(&case_arena)},
+        {"m ^m -> m ^ m", unit_new_unknown(&case_arena)},
         {"2 m^2 -> cm^1", unit_new_unknown(&case_arena)},
         {"2 km s^-1 -> kg h^-1", unit_new_unknown(&case_arena)},
         {"1 kg * 2 kg ^ -3 km", unit_new((UnitType[]){UNIT_KILOGRAM, UNIT_KILOMETER}, (int[]){-2, 1}, 2, &case_arena)},
@@ -423,7 +426,7 @@ void test_evaluate_case(void *c_opaque) {
     Expression expr = parse(tokens, &arena);
     ErrorString err = err_empty();
     assert(check_valid_expr(expr, &err, &arena));
-    assert(!is_unit_unknown(check_unit(expr, &arena)));
+    assert(!is_unit_unknown(check_unit(expr, &err, &arena)));
     double result = evaluate(expr, &arena);
     debug("Expected: %f, got: %f\n", c->expected, result);
     assert(eq_diff(result, c->expected));

@@ -198,39 +198,6 @@ bool units_equal(Unit a, Unit b, Arena *arena) {
     return all_found;
 }
 
-bool unit_convert_valid(Unit a, Unit b, Arena *arena) {
-    if (is_unit_none(a) != is_unit_none(b)) {
-        printf("Convert invalid: one unit is none but no the other: Left: %s Right: %s\n",
-            display_unit(a, arena), display_unit(b, arena));
-        return false;
-    }
-    if (is_unit_unknown(a) || is_unit_unknown(b)) {
-        printf("Convert invalid, unknown units: Left: %s Right: %s\n",
-            display_unit(a, arena), display_unit(b, arena));
-        return false;
-    }
-    if (a.length != b.length) {
-        printf("Convert invalid, lengths not equal: Expected: %zu Got: %zu\n", b.length, a.length);
-        return false;
-    }
-    bool all_convertible = true;
-    for (size_t i = 0; i < a.length; i++) {
-        bool convertible = false;
-        for (size_t j = 0; j < b.length; j++) {
-            if (unit_category(a.types[i]) == unit_category(b.types[j]) && a.degrees[i] == b.degrees[j]) {
-                convertible = true;
-                break;
-            }
-        }
-        all_convertible &= convertible;
-    }
-    if (!all_convertible) {
-        printf("Convert invalid: Left: %s Right %s\n",
-            display_unit(a, arena), display_unit(b, arena));
-    }
-    return all_convertible;
-}
-
 double unit_convert_factor(Unit a, Unit b, Arena *arena) {
     // Should only be called if we are able to convert
     debug("a: %s b: %s a.length: %zu b.length: %zu\n",

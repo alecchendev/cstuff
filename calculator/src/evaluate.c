@@ -1,8 +1,9 @@
 #pragma once
 
+#include <stdarg.h>
+#include <stdio.h>
 #include "parse.c"
 #include "unit.c"
-#include <stdio.h>
 
 double evaluate(Expression expr, Arena *arena);
 
@@ -14,6 +15,34 @@ struct ErrorString {
 
 ErrorString err_empty() {
     return (ErrorString) { .msg = NULL, .len = 0 };
+}
+
+// Basically printf for an error string!
+ErrorString err_new(Arena *arena, const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+
+    // Determine required size
+    va_list ap_dup;
+    va_copy(ap_dup, ap);
+    int size = vsnprintf(NULL, 0, fmt, ap_dup);
+    va_end(ap_dup);
+
+    if (size < 0) {
+        va_end(ap);
+        return err_empty();
+    }
+
+    // Allocate and write string
+    ErrorString err = err_empty();
+    err.len = size + 1;
+    err.msg = arena_alloc(arena, err.len);
+
+    int ret = vsnprintf(err.msg, err.len, fmt, ap);
+    va_end(ap);
+    assert(ret != -1);
+
+    return err;
 }
 
 // While these are helpful sometimes,
@@ -45,9 +74,7 @@ bool check_valid_expr(Expression expr, ErrorString *err, Arena *arena) {
             if (right_type == EXPR_CONSTANT || right_type == EXPR_NEG || right_type == EXPR_CONST_UNIT) {
                 return true;
             }
-            err->len = sizeof(invalid_neg_msg) + EXPR_OP_MAX;
-            err->msg = arena_alloc(arena, err->len);
-            snprintf(err->msg, err->len, invalid_neg_msg, display_expr_op(right_type));
+            *err = err_new(arena, invalid_neg_msg, display_expr_op(right_type));
             return false;
         case EXPR_CONST_UNIT: case EXPR_COMP_UNIT: case EXPR_ADD: case EXPR_SUB:
         case EXPR_MUL: case EXPR_DIV: case EXPR_CONVERT: case EXPR_POW: case EXPR_DIV_UNIT:
@@ -60,9 +87,7 @@ bool check_valid_expr(Expression expr, ErrorString *err, Arena *arena) {
         case EXPR_EMPTY: case EXPR_QUIT: case EXPR_HELP:
             return true;
         case EXPR_INVALID:
-            err->len = sizeof(invalid_token_msg);
-            err->msg = arena_alloc(arena, err->len);
-            memcpy(err->msg, invalid_token_msg, err->len); // TODO: print actual token
+            *err = err_new(arena, invalid_token_msg);
             return false;
     }
     if (!left_valid || !right_valid) {
@@ -77,18 +102,14 @@ bool check_valid_expr(Expression expr, ErrorString *err, Arena *arena) {
                 (expr_is_unit(right_type))) {
                 return true;
             }
-            err->len = sizeof(invalid_const_unit_msg) + 2 * EXPR_OP_MAX;
-            err->msg = arena_alloc(arena, err->len);
-            snprintf(err->msg, err->len, invalid_const_unit_msg,
+            *err = err_new(arena, invalid_const_unit_msg,
                 display_expr_op(left_type), display_expr_op(right_type));
             return false;
         case EXPR_DIV_UNIT:
             if (expr_is_unit(left_type) && expr_is_unit(right_type)) {
                 return true;
             }
-            err->len = sizeof(invalid_div_unit_msg) + 2 * EXPR_OP_MAX;
-            err->msg = arena_alloc(arena, err->len);
-            snprintf(err->msg, err->len, invalid_div_unit_msg,
+            *err = err_new(arena, invalid_div_unit_msg,
                 display_expr_op(left_type), display_expr_op(right_type));
             return false;
         case EXPR_COMP_UNIT:
@@ -96,9 +117,7 @@ bool check_valid_expr(Expression expr, ErrorString *err, Arena *arena) {
                 (right_type == EXPR_UNIT || right_type == EXPR_POW)) {
                 return true;
             }
-            err->len = sizeof(invalid_comp_unit_msg) + 2 * EXPR_OP_MAX;
-            err->msg = arena_alloc(arena, err->len);
-            snprintf(err->msg, err->len, invalid_comp_unit_msg,
+            *err = err_new(arena, invalid_comp_unit_msg,
                 display_expr_op(left_type), display_expr_op(right_type));
             return false;
         case EXPR_ADD: case EXPR_SUB: case EXPR_MUL: case EXPR_DIV:
@@ -106,27 +125,21 @@ bool check_valid_expr(Expression expr, ErrorString *err, Arena *arena) {
                 (expr.type == EXPR_DIV && expr_is_unit(left_type) && expr_is_unit(right_type))) {
                 return true;
             }
-            err->len = sizeof(invalid_math_msg) + 2 * EXPR_OP_MAX;
-            err->msg = arena_alloc(arena, err->len);
-            snprintf(err->msg, err->len, invalid_math_msg, display_expr_op(expr.type),
+            *err = err_new(arena, invalid_math_msg, display_expr_op(expr.type),
                 display_expr_op(left_type), display_expr_op(right_type));
             return false;
         case EXPR_CONVERT:
             if (expr_is_number(left_type) && expr_is_unit(right_type)) {
                 return true;
             }
-            err->len = sizeof(invalid_math_msg) + 2 * EXPR_OP_MAX;
-            err->msg = arena_alloc(arena, err->len);
-            snprintf(err->msg, err->len, invalid_math_msg, display_expr_op(expr.type),
+            *err = err_new(arena, invalid_math_msg, display_expr_op(expr.type),
                 display_expr_op(left_type), display_expr_op(right_type));
             return false;
         case EXPR_POW:
             if (expr_is_unit(left_type) && (right_type == EXPR_CONSTANT || right_type == EXPR_NEG)) {
                 return true;
             }
-            err->len = sizeof(invalid_pow_msg) + 2 * EXPR_OP_MAX;
-            err->msg = arena_alloc(arena, err->len);
-            snprintf(err->msg, err->len, invalid_pow_msg,
+            *err = err_new(arena, invalid_pow_msg,
                 display_expr_op(left_type), display_expr_op(right_type));
             return false;
         default:
@@ -135,7 +148,48 @@ bool check_valid_expr(Expression expr, ErrorString *err, Arena *arena) {
     }
 }
 
-Unit check_unit(Expression expr, Arena *arena) {
+const char none_convert_msg[] = "Convert invalid: one unit is none but not the other: Left: %s Right: %s";
+const char unknown_convert_msg[] = "Convert invalid, unknown units: Left: %s Right: %s";
+const char neq_length_msg[] = "Convert invalid: lengths not equal: Left: %s Right: %s";
+const char general_bad_convert_msg[] = "Convert invalid: Left: %s Right %s";
+
+bool unit_convert_valid(Unit a, Unit b, ErrorString *err, Arena *arena) {
+    if (is_unit_none(a) != is_unit_none(b)) {
+        *err = err_new(arena, none_convert_msg,
+            display_unit(a, arena), display_unit(b, arena));
+        return false;
+    }
+    if (is_unit_unknown(a) || is_unit_unknown(b)) {
+        return false;
+        *err = err_new(arena, unknown_convert_msg,
+            display_unit(a, arena), display_unit(b, arena));
+        return false;
+    }
+    if (a.length != b.length) {
+        // Just reusing instead of a separate double const
+        *err = err_new(arena, neq_length_msg,
+            display_unit(a, arena), display_unit(b, arena));
+        return false;
+    }
+    bool all_convertible = true;
+    for (size_t i = 0; i < a.length; i++) {
+        bool convertible = false;
+        for (size_t j = 0; j < b.length; j++) {
+            if (unit_category(a.types[i]) == unit_category(b.types[j]) && a.degrees[i] == b.degrees[j]) {
+                convertible = true;
+                break;
+            }
+        }
+        all_convertible &= convertible;
+    }
+    if (!all_convertible) {
+        *err = err_new(arena, general_bad_convert_msg,
+            display_unit(a, arena), display_unit(b, arena));
+    }
+    return all_convertible;
+}
+
+Unit check_unit(Expression expr, ErrorString *err, Arena *arena) {
     if (expr.type == EXPR_CONSTANT) {
         debug("constant: %lf\n", expr.expr.constant);
         return unit_new_none(arena);
@@ -144,45 +198,37 @@ Unit check_unit(Expression expr, Arena *arena) {
         return unit_new_single(expr.expr.unit_type, 1, arena);
     } else if (expr.type == EXPR_NEG) {
         debug("neg\n");
-        return check_unit(*expr.expr.unary_expr.right, arena);
+        return check_unit(*expr.expr.unary_expr.right, err, arena);
     } else if (expr.type == EXPR_EMPTY || expr.type == EXPR_QUIT || expr.type == EXPR_INVALID) {
         debug("empty, quit, or invalid, no unit: %d\n", expr.type);
         return unit_new_unknown(arena);
     }
 
-    Unit left = check_unit(*expr.expr.binary_expr.left, arena);
-    Unit right = check_unit(*expr.expr.binary_expr.right, arena);
+    Unit left = check_unit(*expr.expr.binary_expr.left, err, arena);
+    Unit right = check_unit(*expr.expr.binary_expr.right, err, arena);
     debug("left: %s, right: %s\n", display_unit(left, arena), display_unit(right, arena));
 
-    if (expr.type == EXPR_CONVERT) {
-        if (is_unit_unknown(left) || is_unit_unknown(right)) {
-            printf("Cannot convert to or from unknown unit\n");
-            return unit_new_unknown(arena);
-        }
-        if (!unit_convert_valid(left, right, arena)) {
-            // Already printed reason inside of function
-            return unit_new_unknown(arena);
-        }
-        return right;
-    }
-
-    if (expr.type == EXPR_POW) {
-        if (is_unit_unknown(left) || is_unit_none(left) || left.length != 1 || !is_unit_none(right)) {
-            printf("Expected single degree unit ^ constant: %s ^ %s\n", display_unit(left, arena), display_unit(right, arena));
+    Unit unit = unit_new_unknown(arena);
+    if (is_unit_unknown(left) || is_unit_unknown(right)) {
+        // Already printed reason to err when checking unit of left/right
+        debug("unit unknown\n");
+        unit = unit_new_unknown(arena);
+    } else if (expr.type == EXPR_POW) {
+        if (is_unit_none(left) || left.length != 1 || !is_unit_none(right)) {
+            *err = err_new(arena, "Expected single degree unit ^ constant: %s ^ %s",
+                display_unit(left, arena), display_unit(right, arena));
             return unit_new_unknown(arena);
         }
         debug("pow: %s ^ %lf\n", display_unit(left, arena), expr.expr.binary_expr.right->expr.constant);
         left.degrees[0] *= evaluate(*expr.expr.binary_expr.right, arena);
-        return left;
-    }
-
-    Unit unit = unit_new_unknown(arena);
-    if (is_unit_unknown(left) || is_unit_unknown(right)) {
-        // Case to make sure we don't print our error message again
-        debug("unit unknown\n");
-        unit = unit_new_unknown(arena);
+        unit = left;
+    } else if (expr.type == EXPR_CONVERT) {
+        if (!unit_convert_valid(left, right, err, arena)) {
+            return unit_new_unknown(arena);
+        }
+        unit = right;
     } else if (expr.type == EXPR_ADD || expr.type == EXPR_SUB) {
-        if (unit_convert_valid(right, left, arena)) {
+        if (unit_convert_valid(right, left, err, arena)) {
             debug("units convertible for add/sub\n");
             unit = left;
         } else {
@@ -201,6 +247,10 @@ Unit check_unit(Expression expr, Arena *arena) {
     } else if (expr.type == EXPR_COMP_UNIT) {
         debug("combining units for comp\n");
         unit = unit_combine(left, right, true, arena);
+        if (is_unit_unknown(unit)) {
+            *err = err_new(arena, "Cannot compose units of same category: Left: %s Right: %s",
+                display_unit(left, arena), display_unit(right, arena));
+        }
     } else if (expr.type == EXPR_DIV || expr.type == EXPR_DIV_UNIT) {
         debug("dividing units\n");
         for (size_t i = 0; i < right.length; i++) {
@@ -208,7 +258,7 @@ Unit check_unit(Expression expr, Arena *arena) {
         }
         unit = unit_combine(left, right, false, arena);
     } else {
-        printf("Units do not match: %s %s %s\n", display_unit(left, arena),
+        *err = err_new(arena, "Units do not match: %s %s %s", display_unit(left, arena),
            display_expr_op(expr.type), display_unit(right, arena));
         unit = unit_new_unknown(arena);
     }
@@ -216,6 +266,7 @@ Unit check_unit(Expression expr, Arena *arena) {
 }
 
 double evaluate(Expression expr, Arena *arena) {
+    ErrorString err = err_empty();
     double left = 0;
     double right = 0;
     Unit left_unit, right_unit;
@@ -232,16 +283,16 @@ double evaluate(Expression expr, Arena *arena) {
         case EXPR_CONST_UNIT:
             return evaluate(*expr.expr.binary_expr.left, arena);
         case EXPR_ADD: case EXPR_SUB: case EXPR_MUL: case EXPR_DIV:
-            left_unit = check_unit(*expr.expr.binary_expr.left, arena);
-            right_unit = check_unit(*expr.expr.binary_expr.right, arena);
+            left_unit = check_unit(*expr.expr.binary_expr.left, &err, arena);
+            right_unit = check_unit(*expr.expr.binary_expr.right, &err, arena);
             left = evaluate(*expr.expr.binary_expr.left, arena);
             right = evaluate(*expr.expr.binary_expr.right, arena);
             break;
         case EXPR_CONVERT:
             // TODO: Return a unit tree from check_unit so we don't have to run this
             // (and allocate memory) again?
-            left_unit = check_unit(*expr.expr.binary_expr.left, arena);
-            right_unit = check_unit(*expr.expr.binary_expr.right, arena);
+            left_unit = check_unit(*expr.expr.binary_expr.left, &err, arena);
+            right_unit = check_unit(*expr.expr.binary_expr.right, &err, arena);
             left = evaluate(*expr.expr.binary_expr.left, arena);
             return left * unit_convert_factor(left_unit, right_unit, arena);
         case EXPR_EMPTY: case EXPR_QUIT: case EXPR_HELP: case EXPR_INVALID:
