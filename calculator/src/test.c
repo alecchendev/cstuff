@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "arena.c"
 #include "evaluate.c"
+#include "hash_map.c"
 #include "parse.c"
 #include "tokenize.c"
 #include "debug.c"
@@ -527,6 +528,118 @@ void test_display_unit(void *case_idx_opaque) {
     arena_free(&arena);
 }
 
+void test_is_pow_two(void *_) {
+    const size_t upper_bound = 256 + 1;
+    bool expected[upper_bound];
+    memset(expected, false, upper_bound);
+    expected[0] = true;
+    for (size_t i = 0; i < 8 + 1; i++) {
+        expected[1 << i] = true;
+    }
+    for (size_t i = 0; i < upper_bound; i++) {
+        debug("i: %zu\n", i);
+        assert_eq(is_pow_two(i), expected[i]);
+    }
+}
+
+void test_hash_map_int(void *_) {
+    const unsigned char *key1 = (unsigned char *)"x";
+    const unsigned char *key2 = (unsigned char *)"x2";
+    const unsigned char *key3 = (unsigned char *)"abcdefghijklmnoppqrstuvwxyz";
+    const unsigned char *key4 = (unsigned char *)"x4";
+    int val1 = 1;
+    int val2 = 2;
+    int val3 = 3;
+    int val4 = 4;
+
+    Arena arena = arena_create();
+    HashMap map = hash_map_new_capacity(4, sizeof(int), &arena);
+    hash_map_insert(&map, key1, (void *)&val1, &arena);
+    hash_map_insert(&map, key2, (void *)&val2, &arena);
+
+    assert_eq(map.capacity, 4);
+    assert_eq(map.size, 2);
+    assert(hash_map_contains(&map, key1));
+    assert(hash_map_contains(&map, key2));
+    assert_eq(*(int *)hash_map_get(&map, key1), val1);
+    assert_eq(*(int *)hash_map_get(&map, key2), val2);
+
+    hash_map_insert(&map, key3, (void *)&val3, &arena);
+    hash_map_insert(&map, key4, (void *)&val4, &arena);
+
+    assert_eq(map.capacity, 8);
+    assert_eq(map.size, 4);
+    assert(hash_map_contains(&map, key1));
+    assert(hash_map_contains(&map, key2));
+    assert(hash_map_contains(&map, key3));
+    assert(hash_map_contains(&map, key4));
+    assert_eq(*(int *)hash_map_get(&map, key1), val1);
+    assert_eq(*(int *)hash_map_get(&map, key2), val2);
+    assert_eq(*(int *)hash_map_get(&map, key3), val3);
+    assert_eq(*(int *)hash_map_get(&map, key4), val4);
+}
+
+typedef struct TestStruct TestStruct;
+struct TestStruct {
+    int num;
+    bool val;
+};
+
+bool test_struct_eq(TestStruct a, TestStruct b) {
+    return a.num == b.num && a.val == b.val;
+}
+
+void test_hash_map_struct(void *_) {
+    const unsigned char *key1 = (unsigned char *)"x";
+    const unsigned char *key2 = (unsigned char *)"x2";
+    const unsigned char *key3 = (unsigned char *)"abcdefghijklmnoppqrstuvwxyz";
+    const unsigned char *key4 = (unsigned char *)"x4";
+    TestStruct val1 = { .num = 1, .val = false };
+    TestStruct val2 = { .num = 2, .val = true };
+    TestStruct val3 = { .num = 3, .val = true };
+    TestStruct val4 = { .num = 4, .val = false };
+
+    Arena arena = arena_create();
+    HashMap map = hash_map_new_capacity(4, sizeof(TestStruct), &arena);
+    hash_map_insert(&map, (unsigned char *)key1, (void *)&val1, &arena);
+    hash_map_insert(&map, (unsigned char *)key2, (void *)&val2, &arena);
+
+    assert_eq(map.capacity, 4);
+    assert_eq(map.size, 2);
+    assert(hash_map_contains(&map, key1));
+    assert(hash_map_contains(&map, key2));
+    assert(test_struct_eq(*(TestStruct *)hash_map_get(&map, key1), val1));
+    assert(test_struct_eq(*(TestStruct *)hash_map_get(&map, key2), val2));
+
+    hash_map_insert(&map, key3, (void *)&val3, &arena);
+    hash_map_insert(&map, key4, (void *)&val4, &arena);
+
+    assert_eq(map.capacity, 8);
+    assert_eq(map.size, 4);
+    assert(hash_map_contains(&map, key1));
+    assert(hash_map_contains(&map, key2));
+    assert(hash_map_contains(&map, key3));
+    assert(hash_map_contains(&map, key4));
+    assert(test_struct_eq(*(TestStruct *)hash_map_get(&map, key1), val1));
+    assert(test_struct_eq(*(TestStruct *)hash_map_get(&map, key2), val2));
+    assert(test_struct_eq(*(TestStruct *)hash_map_get(&map, key3), val3));
+    assert(test_struct_eq(*(TestStruct *)hash_map_get(&map, key4), val4));
+}
+
+void test_hash_map(void *case_idx_opaque) {
+    void (*cases[])(void *) = {
+        test_hash_map_int,
+        test_hash_map_struct,
+    };
+    const size_t n_tests = sizeof(cases) / sizeof(cases[0]);
+    bool all_passed = true;
+    CaseBound bound = case_bound(*(size_t *)case_idx_opaque, n_tests);
+    for (size_t i = bound.start; i < bound.end; i++) {
+        all_passed &= run_test_case(i, cases[i], NULL, NULL, "Case %zu failed\n");
+    }
+    assert(all_passed);
+}
+
 int main(int argc, char **argv) {
     ssize_t single_test_idx = -1;
     ssize_t single_case_idx = -1;
@@ -553,6 +666,8 @@ int main(int argc, char **argv) {
         test_evaluate,
         test_unit_mirror,
         test_display_unit,
+        test_is_pow_two,
+        test_hash_map,
     };
     const size_t n_tests = sizeof(tests) / sizeof(tests[0]);
     bool all_passed = true;
