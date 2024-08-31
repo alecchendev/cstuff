@@ -101,6 +101,7 @@ void test_tokenize_case(void *c_opaque) {
 }
 
 void test_tokenize(void *case_idx_opaque) {
+    Arena case_arena = arena_create();
     char max_len_input[MAX_INPUT + 1] = {0};
     memset(max_len_input, 'x', MAX_INPUT + 1);
     TokenCase cases[] = {
@@ -117,10 +118,10 @@ void test_tokenize(void *case_idx_opaque) {
         {"3.32e2", 2, {token_new_num(332), end_token}},
         {"3.32E2", 2, {token_new_num(332), end_token}},
         {"3.32e-2", 1, {invalid_token}}, // TODO: handle negatives generally + in scientific notation?
-        {"asdf", 1, {invalid_token}},
+        {"asdf", 2, {token_new_variable("asdf", &case_arena), end_token}},
         {"quit", 1, {quit_token}},
         {"exit", 1, {quit_token}},
-        {"quitX", 1, {invalid_token}}, // TODO: this should be invalid
+        {"quitX", 2, {token_new_variable("quitX", &case_arena), end_token}},
         {max_len_input, 1, {invalid_token}},
         // Units
         {"3 cm + 5.5min", 6, {
@@ -141,6 +142,9 @@ void test_tokenize(void *case_idx_opaque) {
             sub_token, token_new_num(50), token_new_unit(UNIT_KILOGRAM), caret_token, token_new_num(2),
             token_new_unit(UNIT_KILOMETER), caret_token, sub_token, token_new_num(2), end_token
         }},
+        {"x = 4", 4, {token_new_variable("x", &case_arena), equals_token, token_new_num(4), end_token}},
+        {"aSd4_f8", 2, {token_new_variable("aSd4_f8", &case_arena), end_token}},
+        {"aS&4_f8", 2, {token_new_variable("aS", &case_arena), invalid_token}},
         // TODO: more comprehensive
     };
     const size_t num_cases = sizeof(cases) / sizeof(TokenCase);
@@ -152,6 +156,7 @@ void test_tokenize(void *case_idx_opaque) {
                                      NULL, "Case %zu failed\n");
     }
     assert(all_passed);
+    arena_free(&case_arena);
 }
 
 typedef struct {
@@ -172,8 +177,14 @@ bool exprs_equal(Expression a, Expression b, Arena *arena) {
             }
             return true;
         case EXPR_UNIT:
-            if (a.type == EXPR_UNIT && a.expr.unit_type != b.expr.unit_type) {
+            if (a.expr.unit_type != b.expr.unit_type) {
                 printf("Expected unit %s, got %s\n", unit_strings[b.expr.unit_type], unit_strings[a.expr.unit_type]);
+                return false;
+            }
+            return true;
+        case EXPR_VAR:
+            if (strncmp((char *)a.expr.var_name, (char *)b.expr.var_name, MAX_INPUT) != 0) {
+                printf("Expected var %s, got %s\n", b.expr.var_name, a.expr.var_name);
                 return false;
             }
             return true;
@@ -181,7 +192,7 @@ bool exprs_equal(Expression a, Expression b, Arena *arena) {
             return exprs_equal(*a.expr.unary_expr.right, *b.expr.unary_expr.right, arena);
         case EXPR_CONST_UNIT: case EXPR_COMP_UNIT:
         case EXPR_ADD: case EXPR_SUB: case EXPR_MUL: case EXPR_DIV:
-        case EXPR_CONVERT: case EXPR_POW: case EXPR_DIV_UNIT:
+        case EXPR_CONVERT: case EXPR_POW: case EXPR_DIV_UNIT: case EXPR_SET_VAR:
             if (!exprs_equal(*a.expr.binary_expr.left, *b.expr.binary_expr.left, arena)) {
                 return false;
             }
@@ -287,7 +298,11 @@ void test_parse(void *case_idx_opaque) {
                 expr_new_neg(expr_new_neg(expr_new_neg(expr_new_const_unit(6, expr_new_unit(UNIT_POUND), &case_arena), &case_arena), &case_arena), &case_arena),
             &case_arena),
             expr_new_neg(expr_new_neg(expr_new_const_unit(7, expr_new_unit_degree(UNIT_OUNCE, expr_new_neg(expr_new_const(8), &case_arena), &case_arena), &case_arena), &case_arena), &case_arena),
-        &case_arena)}
+        &case_arena)},
+        {"x = 4", expr_new_bin(EXPR_SET_VAR,
+            expr_new_var((unsigned char *)"x", &case_arena),
+            expr_new_const(4),
+        &case_arena)},
         /*{"1 + 2km * 3 h / 2 km ^-2"}*/
 
         // "5 s^-2 km^3 cm^4 oz^5 lb * 2 s^2 / 3 km ^3"
@@ -327,10 +342,10 @@ void test_invalid_expr(void *case_idx_opaque) {
         {"* / ^"},
         {" -> km"},
         {"1 / km"},
-        {"1 + asdf"},
+        /*{"1 + asdf"},*/
         {"1 asdf 2"},
         {"1 km ^ asdf 2 km"},
-        {"asdf"},
+        /*{"asdf"},*/
         {"asdf asdf"},
         {"asdf asdf asdf"},
         {"asdf asdf asdf asdf"},

@@ -11,6 +11,8 @@ typedef enum TokenType TokenType;
 enum TokenType {
     TOK_NUM,
     TOK_UNIT,
+    TOK_VAR,
+    TOK_EQUALS,
     TOK_CONVERT,
     TOK_ADD,
     TOK_SUB,
@@ -27,8 +29,11 @@ enum TokenType {
 typedef struct Token Token;
 struct Token {
     TokenType type;
-    UnitType unit_type;
-    double number;
+    union {
+        UnitType unit_type;
+        double number;
+        unsigned char *var_name;
+    };
 };
 
 #define MAX_INPUT 256
@@ -65,6 +70,7 @@ const Token mul_token = {TOK_MUL};
 const Token div_token = {TOK_DIV};
 const Token caret_token = {TOK_CARET};
 const Token convert_token = {TOK_CONVERT};
+const Token equals_token = {TOK_EQUALS};
 
 Token token_new_num(double num) {
     return (Token){TOK_NUM, .number = num };
@@ -74,9 +80,16 @@ Token token_new_unit(UnitType unit) {
     return (Token){TOK_UNIT, .unit_type = unit};
 }
 
+Token token_new_variable(char string_token[MAX_INPUT], Arena *arena) {
+    size_t name_len = strnlen(string_token, MAX_INPUT) + 1;
+    Token token = { .type = TOK_VAR, .var_name = arena_alloc(arena, name_len) };
+    memcpy(token.var_name, string_token, name_len);
+    return token;
+}
+
 // TODO: make this more generic where I can simply define
 // basically a table of strings and their corresponding tokens
-Token next_token(const char *input, size_t *pos, size_t length) {
+Token next_token(const char *input, size_t *pos, size_t length, Arena *arena) {
     if (*pos >= length || input[*pos] == '\0') {
         if (*pos != length) {
             debug("Invalid end of input, next: %c\n", input[*pos+1]);
@@ -89,7 +102,7 @@ Token next_token(const char *input, size_t *pos, size_t length) {
     if (is_letter(input[*pos])) {
         debug("Letter: %c, next: %c\n", input[*pos], input[*pos+1]);
         char string_token[MAX_INPUT] = {0};
-        for (size_t i = 0; is_letter(input[*pos]); i++) {
+        for (size_t i = 0; is_letter(input[*pos]) || is_digit(input[*pos]) || input[*pos] == '_'; i++) {
             string_token[i] = input[*pos];
             (*pos)++;
         }
@@ -109,7 +122,7 @@ Token next_token(const char *input, size_t *pos, size_t length) {
                 return token_new_unit(unit);
             }
         }
-        return invalid_token;
+        return token_new_variable(string_token, arena);
     }
 
     const unsigned char whitespace[3] = {' ', '\t', '\n'};
@@ -121,7 +134,7 @@ Token next_token(const char *input, size_t *pos, size_t length) {
         return whitespace_token;
     }
 
-    const unsigned char operators[5] = {'+', '-', '*', '/', '^'};
+    const unsigned char operators[6] = {'+', '-', '*', '/', '^', '='};
     if (char_in_set(input[*pos], operators, sizeof(operators))) {
         debug("Operator: %c\n", input[*pos]);
         Token token = invalid_token;
@@ -139,8 +152,10 @@ Token next_token(const char *input, size_t *pos, size_t length) {
             token = mul_token;
         } else if (input[*pos] == '/') {
             token = div_token;
-        } else {
+        } else if (input[*pos] == '^'){
             token = caret_token;
+        } else {
+            token = equals_token;
         }
         (*pos)++;
         return token;
@@ -200,7 +215,7 @@ TokenString tokenize(const char *input, Arena *arena) {
         return token_string;
     }
     while (!done) {
-        Token token = next_token(input, &pos, input_length);
+        Token token = next_token(input, &pos, input_length, arena);
         if (token.type == TOK_INVALID || token.type == TOK_END || token.type == TOK_QUIT) {
             done = true;
         } else if (token.type == TOK_WHITESPACE) {
@@ -223,8 +238,17 @@ void token_display(Token token) {
         case TOK_QUIT:
             debug("Quit token\n");
             break;
+        case TOK_HELP:
+            debug("Help token\n");
+            break;
         case TOK_NUM:
             debug("Number: %f\n", token.number);
+            break;
+        case TOK_VAR:
+            debug("Variable: %s\n", token.var_name);
+            break;
+        case TOK_EQUALS:
+            debug("Equals token\n");
             break;
         case TOK_ADD:
             debug("Addition token\n");
@@ -250,8 +274,6 @@ void token_display(Token token) {
         case TOK_CARET:
             debug("Caret token\n");
             break;
-        default:
-            debug("Unknown token\n");
-            break;
     }
+    debug("Unknown token\n");
 }

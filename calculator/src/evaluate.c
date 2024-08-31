@@ -59,6 +59,7 @@ const char invalid_div_unit_msg[] = "Expected to divide two units, instead got l
 const char invalid_comp_unit_msg[] = "Expected to combine two units, instead got left: %s right: %s";
 const char invalid_math_msg[] = "Expected to %s two numbers, instead got left: %s right: %s";
 const char invalid_pow_msg[] = "Expected to raise unit to degree, instead got left: %s right: %s";
+const char invalid_set_var_msg[] = "Expected to set variable, instead got left: %s right: %s";
 
 bool check_valid_expr(Expression expr, ErrorString *err, Arena *arena) {
     if (err->len > 0) return false;
@@ -67,7 +68,7 @@ bool check_valid_expr(Expression expr, ErrorString *err, Arena *arena) {
     ExprType left_type = EXPR_INVALID;
     ExprType right_type = EXPR_INVALID;
     switch (expr.type) {
-        case EXPR_CONSTANT: case EXPR_UNIT:
+        case EXPR_CONSTANT: case EXPR_UNIT: case EXPR_VAR:
             return true;
         case EXPR_NEG:
             right_type = expr.expr.unary_expr.right->type;
@@ -78,6 +79,7 @@ bool check_valid_expr(Expression expr, ErrorString *err, Arena *arena) {
             return false;
         case EXPR_CONST_UNIT: case EXPR_COMP_UNIT: case EXPR_ADD: case EXPR_SUB:
         case EXPR_MUL: case EXPR_DIV: case EXPR_CONVERT: case EXPR_POW: case EXPR_DIV_UNIT:
+        case EXPR_SET_VAR:
             left_type = expr.expr.binary_expr.left->type;
             right_type = expr.expr.binary_expr.right->type;
             debug("curr: %d left: %d right: %d\n", expr.type, left_type, right_type);
@@ -140,6 +142,13 @@ bool check_valid_expr(Expression expr, ErrorString *err, Arena *arena) {
                 return true;
             }
             *err = err_new(arena, invalid_pow_msg,
+                display_expr_op(left_type), display_expr_op(right_type));
+            return false;
+        case EXPR_SET_VAR:
+            if (left_type == EXPR_VAR && expr_is_number(right_type)) {
+                return true;
+            }
+            *err = err_new(arena, invalid_set_var_msg,
                 display_expr_op(left_type), display_expr_op(right_type));
             return false;
         default:
@@ -273,6 +282,8 @@ double evaluate(Expression expr, Arena *arena) {
     switch (expr.type) {
         case EXPR_CONSTANT:
             return expr.expr.constant;
+        case EXPR_VAR:
+            assert(false); // TODO
         case EXPR_POW: // Pow only means unit degrees for now
         case EXPR_UNIT:
         case EXPR_COMP_UNIT:
@@ -282,6 +293,8 @@ double evaluate(Expression expr, Arena *arena) {
             return -evaluate(*expr.expr.unary_expr.right, arena);
         case EXPR_CONST_UNIT:
             return evaluate(*expr.expr.binary_expr.left, arena);
+        case EXPR_SET_VAR:
+            assert(false);
         case EXPR_ADD: case EXPR_SUB: case EXPR_MUL: case EXPR_DIV:
             left_unit = check_unit(*expr.expr.binary_expr.left, &err, arena);
             right_unit = check_unit(*expr.expr.binary_expr.right, &err, arena);

@@ -37,6 +37,8 @@ typedef enum {
     EXPR_DIV,
     EXPR_CONVERT,
     EXPR_POW,
+    EXPR_VAR,
+    EXPR_SET_VAR,
     EXPR_EMPTY,
     EXPR_QUIT,
     EXPR_HELP,
@@ -45,6 +47,7 @@ typedef enum {
 
 typedef union {
     double constant;
+    unsigned char *var_name;
     UnitType unit_type;
     UnaryExpr unary_expr;
     BinaryExpr binary_expr;
@@ -54,6 +57,13 @@ struct Expression {
     ExprType type;
     ExprData expr;
 };
+
+Expression expr_new_var(unsigned char *var_name, Arena *arena) {
+    size_t name_len = strnlen((char *)var_name, MAX_INPUT) + 1;
+    Expression expr = { .type = EXPR_VAR, .expr = { .var_name = arena_alloc(arena, name_len) }};
+    memcpy(expr.expr.var_name, var_name, name_len);
+    return expr;
+}
 
 Expression expr_new_const(double value) {
     return (Expression) { .type = EXPR_CONSTANT, .expr = { .constant = value }};
@@ -90,27 +100,34 @@ Expression expr_new_unit_comp(Expression unit_expr_1, Expression unit_expr_2, Ar
 }
 
 bool is_bin_op(TokenType type) {
-    return type == TOK_ADD || type == TOK_SUB || type == TOK_MUL ||
-            type == TOK_DIV || type == TOK_CARET || type == TOK_CONVERT;
+    switch (type) {
+        case TOK_ADD: case TOK_SUB: case TOK_MUL:
+        case TOK_DIV: case TOK_CARET: case TOK_CONVERT:
+        case TOK_EQUALS:
+            return true;
+        case TOK_END: case TOK_INVALID: case TOK_QUIT: case TOK_HELP:
+        case TOK_NUM: case TOK_VAR: case TOK_WHITESPACE: case TOK_UNIT:
+            return false;
+    }
 }
 
 bool expr_is_unit(ExprType type) {
     switch (type) {
         case EXPR_UNIT: case EXPR_COMP_UNIT: case EXPR_POW: case EXPR_DIV_UNIT:
             return true;
-        case EXPR_CONSTANT: case EXPR_NEG: case EXPR_CONST_UNIT:
+        case EXPR_CONSTANT: case EXPR_NEG: case EXPR_CONST_UNIT: case EXPR_VAR:
         case EXPR_ADD: case EXPR_SUB: case EXPR_MUL: case EXPR_DIV: case EXPR_CONVERT:
-        case EXPR_EMPTY: case EXPR_QUIT: case EXPR_HELP: case EXPR_INVALID:
+        case EXPR_SET_VAR: case EXPR_EMPTY: case EXPR_QUIT: case EXPR_HELP: case EXPR_INVALID:
             return false;
     }
 }
 
 bool expr_is_number(ExprType type) {
     switch (type) {
-        case EXPR_CONSTANT: case EXPR_NEG: case EXPR_CONST_UNIT:
+        case EXPR_CONSTANT: case EXPR_NEG: case EXPR_CONST_UNIT: case EXPR_VAR:
         case EXPR_ADD: case EXPR_SUB: case EXPR_MUL: case EXPR_DIV: case EXPR_CONVERT:
             return true;
-        case EXPR_UNIT: case EXPR_COMP_UNIT: case EXPR_POW: case EXPR_DIV_UNIT:
+        case EXPR_UNIT: case EXPR_COMP_UNIT: case EXPR_POW: case EXPR_SET_VAR: case EXPR_DIV_UNIT:
         case EXPR_EMPTY: case EXPR_QUIT: case EXPR_HELP: case EXPR_INVALID:
             return false;
     }
@@ -118,6 +135,7 @@ bool expr_is_number(ExprType type) {
 
 // Higher number = parse this first, evaluate this last.
 int precedence(TokenType op, size_t idx, bool prev_is_bin_op, bool next_is_unit) {
+    if (op == TOK_EQUALS) return 10;
     if (op == TOK_CONVERT) return 9;
     if (op == TOK_ADD) return 8;
     if (op == TOK_SUB && idx != 0 && !prev_is_bin_op) return 8; // Not negation
@@ -182,6 +200,10 @@ Expression parse(TokenString tokens, Arena *arena) {
         debug("constant\n");
         return expr_new_const(tokens.tokens[0].number);
     }
+    if (tokens.length == 1 && tokens.tokens[0].type == TOK_VAR) {
+        debug("variable\n");
+        return expr_new_var(tokens.tokens[0].var_name, arena);
+    }
     if (tokens.length == 1) {
         debug("Invalid expression token length 1\n");
         return invalid_expr;
@@ -210,7 +232,9 @@ Expression parse(TokenString tokens, Arena *arena) {
     }
 
     ExprType type;
-    if (op == TOK_CONVERT) {
+    if (op == TOK_EQUALS) {
+        type = EXPR_SET_VAR;
+    } else if (op == TOK_CONVERT) {
         type = EXPR_CONVERT;
     } else if (op == TOK_ADD) {
         type = EXPR_ADD;
@@ -260,6 +284,8 @@ const char *display_expr_op(ExprType type) {
         case EXPR_DIV_UNIT: return "div unit";
         case EXPR_CONVERT: return "->";
         case EXPR_POW: return "^";
+        case EXPR_VAR: return "var";
+        case EXPR_SET_VAR: return "set var";
         case EXPR_CONST_UNIT: return "const x unit";
         case EXPR_COMP_UNIT: return "unit x unit";
         case EXPR_NEG: return "negation";
@@ -283,6 +309,8 @@ void display_expr(size_t offset, Expression expr, Arena *arena) {
         debug("%lf\n", expr.expr.constant);
     } else if (expr.type == EXPR_UNIT) {
         debug("%s\n", unit_strings[expr.expr.unit_type]);
+    } else if (expr.type == EXPR_VAR) {
+        debug("var %s\n", expr.expr.var_name);
     } else if (expr.type == EXPR_NEG) {
         debug("neg\n");
         display_expr(offset + 1, *expr.expr.unary_expr.right, arena);
