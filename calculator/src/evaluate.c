@@ -53,7 +53,7 @@ ErrorString err_new(Arena *arena, const char *fmt, ...) {
 // like this. TODO: show user the block of tokens
 // where they messed up, and it'll probably be
 // obvious.
-const char invalid_token_msg[] = "Invalid token";
+const char invalid_expr_msg[] = "Invalid expression";
 const char invalid_neg_msg[] = "Negation expected right side to be constant, negation, or constant with unit, instead got: %s";
 const char invalid_const_unit_msg[] = "Expected to combine constant with unit, instead got left: %s right: %s";
 const char invalid_div_unit_msg[] = "Expected to divide two units, instead got left: %s right: %s";
@@ -93,7 +93,7 @@ bool check_valid_expr(Expression expr, ErrorString *err, Arena *arena) {
         case EXPR_EMPTY: case EXPR_QUIT: case EXPR_HELP:
             return true;
         case EXPR_INVALID:
-            *err = err_new(arena, invalid_token_msg);
+            *err = err_new(arena, invalid_expr_msg);
             return false;
     }
     if (!left_valid || !right_valid) {
@@ -149,7 +149,8 @@ bool check_valid_expr(Expression expr, ErrorString *err, Arena *arena) {
                 display_expr_op(left_type), display_expr_op(right_type));
             return false;
         case EXPR_SET_VAR:
-            if (left_type == EXPR_VAR && expr_is_number(right_type)) {
+            if (left_type == EXPR_VAR && (expr_is_number(right_type) ||
+                expr_is_unit(right_type))) {
                 return true;
             }
             *err = err_new(arena, invalid_set_var_msg,

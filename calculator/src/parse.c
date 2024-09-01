@@ -52,7 +52,8 @@ bool left_associative(TokenType op, size_t idx, bool prev_is_bin_op) {
 }
 
 // Only time this should return EXPR_INVALID
-// is if we've run into an invalid token
+// is if we've run into an invalid token, OR
+// if we use equals in the wrong way, e.g. x = 1 + 2
 Expression parse(TokenString tokens, Memory mem, Arena *arena) {
     debug("Parsing expression\n");
     for (size_t i = 0; i < tokens.length; i++) {
