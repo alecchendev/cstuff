@@ -48,7 +48,7 @@ typedef enum {
 typedef union {
     double constant;
     unsigned char *var_name;
-    UnitType unit_type;
+    Unit unit;
     UnaryExpr unary_expr;
     BinaryExpr binary_expr;
 } ExprData;
@@ -74,8 +74,9 @@ Expression expr_new_const(double value) {
     return (Expression) { .type = EXPR_CONSTANT, .expr = { .constant = value }};
 }
 
-Expression expr_new_unit(UnitType unit_type) {
-    return (Expression) { .type = EXPR_UNIT, .expr = { .unit_type = unit_type }};
+Expression expr_new_unit(UnitType unit_type, Arena *arena) {
+    return (Expression) { .type = EXPR_UNIT,
+        .expr = { .unit = unit_new_single(unit_type, 1, arena) }};
 }
 
 Expression expr_new_neg(Expression right_value, Arena *arena) {
@@ -97,7 +98,7 @@ Expression expr_new_const_unit(double value, Expression unit_expr, Arena *arena)
 }
 
 Expression expr_new_unit_degree(UnitType unit_type, Expression degree_expr, Arena *arena) {
-    return expr_new_bin(EXPR_POW, expr_new_unit(unit_type), degree_expr, arena);
+    return expr_new_bin(EXPR_POW, expr_new_unit(unit_type, arena), degree_expr, arena);
 }
 
 Expression expr_new_unit_comp(Expression unit_expr_1, Expression unit_expr_2, Arena *arena) {
@@ -161,7 +162,7 @@ void display_expr(size_t offset, Expression expr, Arena *arena) {
     if (expr.type == EXPR_CONSTANT) {
         debug("%lf\n", expr.expr.constant);
     } else if (expr.type == EXPR_UNIT) {
-        debug("%s\n", unit_strings[expr.expr.unit_type]);
+        debug("%s\n", display_unit(expr.expr.unit, arena));
     } else if (expr.type == EXPR_VAR) {
         debug("var %s\n", expr.expr.var_name);
     } else if (expr.type == EXPR_NEG) {

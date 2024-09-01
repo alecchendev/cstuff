@@ -207,8 +207,8 @@ Unit check_unit(Expression expr, Memory *mem, ErrorString *err, Arena *arena) {
         debug("constant: %lf\n", expr.expr.constant);
         return unit_new_none(arena);
     } else if (expr.type == EXPR_UNIT) {
-        debug("unit: %s\n", unit_strings[expr.expr.unit_type]);
-        return unit_new_single(expr.expr.unit_type, 1, arena);
+        debug("unit: %s\n", display_unit(expr.expr.unit, arena));
+        return expr.expr.unit;
     } else if (expr.type == EXPR_VAR) {
         debug("var: %s\n", expr.expr.var_name);
         if (!memory_contains_var(mem, expr.expr.var_name)) {
@@ -240,8 +240,9 @@ Unit check_unit(Expression expr, Memory *mem, ErrorString *err, Arena *arena) {
             return unit_new_unknown(arena);
         }
         debug("pow: %s ^ %lf\n", display_unit(left, arena), expr.expr.binary_expr.right->expr.constant);
-        left.degrees[0] *= evaluate(*expr.expr.binary_expr.right, mem, arena);
-        unit = left;
+        Unit left_dup = unit_new(left.types, left.degrees, left.length, arena);
+        left_dup.degrees[0] *= evaluate(*expr.expr.binary_expr.right, mem, arena);
+        unit = left_dup;
     } else if (expr.type == EXPR_CONVERT) {
         if (!unit_convert_valid(left, right, err, arena)) {
             return unit_new_unknown(arena);
@@ -273,10 +274,11 @@ Unit check_unit(Expression expr, Memory *mem, ErrorString *err, Arena *arena) {
         }
     } else if (expr.type == EXPR_DIV || expr.type == EXPR_DIV_UNIT) {
         debug("dividing units\n");
-        for (size_t i = 0; i < right.length; i++) {
-            right.degrees[i] *= -1;
+        Unit right_dup = unit_new(right.types, right.degrees, right.length, arena);
+        for (size_t i = 0; i < right_dup.length; i++) {
+            right_dup.degrees[i] *= -1;
         }
-        unit = unit_combine(left, right, false, arena);
+        unit = unit_combine(left, right_dup, false, arena);
     } else {
         *err = err_new(arena, "Units do not match: %s %s %s", display_unit(left, arena),
            display_expr_op(expr.type), display_unit(right, arena));

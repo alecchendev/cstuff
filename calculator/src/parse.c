@@ -74,7 +74,7 @@ Expression parse(TokenString tokens, Arena *arena) {
     }
     if (tokens.length == 1 && tokens.tokens[0].type == TOK_UNIT) {
         debug("unit\n");
-        return expr_new_unit(tokens.tokens[0].unit_type);
+        return expr_new_unit(tokens.tokens[0].unit_type, arena);
     }
     if (tokens.length == 1 && tokens.tokens[0].type == TOK_NUM) {
         debug("constant\n");

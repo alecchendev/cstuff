@@ -222,6 +222,7 @@ Unit unit_combine(Unit a, Unit b, bool reject_same_category, Arena *arena) {
     assert(!is_unit_unknown(b));
     if (is_unit_none(a)) return b;
     if (is_unit_none(b)) return a;
+    a = unit_new(a.types, a.degrees, a.length, arena); // Dup because we modify heap data
     bool *a_leftover = arena_alloc(arena, a.length * sizeof(bool));
     bool *b_leftover = arena_alloc(arena, b.length * sizeof(bool));
     memset(a_leftover, true, a.length * sizeof(bool));

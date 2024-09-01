@@ -179,8 +179,9 @@ bool exprs_equal(Expression a, Expression b, Arena *arena) {
             }
             return true;
         case EXPR_UNIT:
-            if (a.expr.unit_type != b.expr.unit_type) {
-                printf("Expected unit %s, got %s\n", unit_strings[b.expr.unit_type], unit_strings[a.expr.unit_type]);
+            if (!units_equal(a.expr.unit, b.expr.unit, arena)) {
+                printf("Expected unit %s, got %s\n", display_unit(b.expr.unit, arena),
+                    display_unit(a.expr.unit, arena));
                 return false;
             }
             return true;
@@ -233,12 +234,12 @@ void test_parse(void *case_idx_opaque) {
             &case_arena),
         &case_arena)},
         {"1 cm -2kg", expr_new_bin(EXPR_SUB,
-            expr_new_const_unit(1, expr_new_unit(UNIT_CENTIMETER), &case_arena),
-            expr_new_const_unit(2, expr_new_unit(UNIT_KILOGRAM), &case_arena),
+            expr_new_const_unit(1, expr_new_unit(UNIT_CENTIMETER, &case_arena), &case_arena),
+            expr_new_const_unit(2, expr_new_unit(UNIT_KILOGRAM, &case_arena), &case_arena),
         &case_arena)},
         {"5 mi / 4 h", expr_new_bin(EXPR_DIV,
-            expr_new_const_unit(5, expr_new_unit(UNIT_MILE), &case_arena),
-            expr_new_const_unit(4, expr_new_unit(UNIT_HOUR), &case_arena),
+            expr_new_const_unit(5, expr_new_unit(UNIT_MILE, &case_arena), &case_arena),
+            expr_new_const_unit(4, expr_new_unit(UNIT_HOUR, &case_arena), &case_arena),
         &case_arena)},
         // Negative
         {"2 * - 3", expr_new_bin(EXPR_MUL, expr_new_const(2),
@@ -246,7 +247,7 @@ void test_parse(void *case_idx_opaque) {
         {"-2 * 3", expr_new_bin(EXPR_MUL, expr_new_neg(expr_new_const(2), &case_arena),
             expr_new_const(3), &case_arena)},
         {"-2 cm * 3", expr_new_bin(EXPR_MUL,
-            expr_new_neg(expr_new_const_unit(2, expr_new_unit(UNIT_CENTIMETER), &case_arena), &case_arena),
+            expr_new_neg(expr_new_const_unit(2, expr_new_unit(UNIT_CENTIMETER, &case_arena), &case_arena), &case_arena),
             expr_new_const(3), &case_arena)},
         {"- 2", expr_new_neg(expr_new_const(2), &case_arena)},
         {"1 - - 2", expr_new_bin(EXPR_SUB, expr_new_const(1),
@@ -297,7 +298,7 @@ void test_parse(void *case_idx_opaque) {
                         expr_new_unit_degree(UNIT_OUNCE, expr_new_neg(expr_new_neg(expr_new_const(5), &case_arena), &case_arena), &case_arena),
                     &case_arena),
                 &case_arena), &case_arena), &case_arena),
-                expr_new_neg(expr_new_neg(expr_new_neg(expr_new_const_unit(6, expr_new_unit(UNIT_POUND), &case_arena), &case_arena), &case_arena), &case_arena),
+                expr_new_neg(expr_new_neg(expr_new_neg(expr_new_const_unit(6, expr_new_unit(UNIT_POUND, &case_arena), &case_arena), &case_arena), &case_arena), &case_arena),
             &case_arena),
             expr_new_neg(expr_new_neg(expr_new_const_unit(7, expr_new_unit_degree(UNIT_OUNCE, expr_new_neg(expr_new_const(8), &case_arena), &case_arena), &case_arena), &case_arena), &case_arena),
         &case_arena)},
