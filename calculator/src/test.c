@@ -109,6 +109,7 @@ void test_tokenize(void *case_idx_opaque) {
     TokenCase cases[] = {
         {"", 1, {end_token}},
         {"1", 2, {token_new_num(1), end_token}},
+        {"1 + ", 3, {token_new_num(1), add_token, end_token}},
         {"1 + 2", 4, {token_new_num(1), add_token, token_new_num(2), end_token}},
         {"\t 1\t+     2  ", 4, {token_new_num(1), add_token, token_new_num(2), end_token}},
         {"1 - 2 * 3 / 4", 8, {
@@ -201,7 +202,7 @@ bool exprs_equal(Expression a, Expression b, Arena *arena) {
             if (!exprs_equal(*a.expr.binary_expr.right, *b.expr.binary_expr.right, arena)) {
                 return false;
             }
-        case EXPR_EMPTY: case EXPR_QUIT: case EXPR_HELP: case EXPR_INVALID:
+        case EXPR_INVALID:
             return true;
     }
 }
@@ -210,6 +211,7 @@ void test_parse_case(void *c_opaque) {
     ParseCase *c = (ParseCase *)c_opaque;
     Arena arena = arena_create();
     TokenString tokens = tokenize(c->input, &arena);
+    assert(sanitize_tokens(&tokens) == CMD_EXPR);
     Expression expr = parse(tokens, &arena);
     debug("input: %s\n", c->input);
     debug("Expected:\n");
@@ -329,6 +331,7 @@ void test_invalid_expr_case(void *c_opaque) {
     InvalidExprCase *c = (InvalidExprCase *)c_opaque;
     Arena arena = arena_create();
     TokenString tokens = tokenize(c->input, &arena);
+    assert(sanitize_tokens(&tokens) == CMD_EXPR);
     Expression expr = parse(tokens, &arena);
     ErrorString err = err_empty();
     assert(!check_valid_expr(expr, &err, &arena));
@@ -354,7 +357,9 @@ void test_invalid_expr(void *case_idx_opaque) {
     };
     const size_t num_cases = sizeof(cases) / sizeof(InvalidExprCase);
     bool all_passed = true;
-    for (size_t i = 0; i < num_cases; i++) {
+    ssize_t case_idx = *(ssize_t *)case_idx_opaque;
+    CaseBound bound = case_bound(case_idx, num_cases);
+    for (size_t i = bound.start; i < bound.end; i++) {
         all_passed &= run_test_case(i, test_invalid_expr_case, (void *)&cases[i],
                                      NULL, "Case %zu failed\n");
     }
@@ -373,6 +378,7 @@ void test_check_unit_case(void *c_opaque) {
     Arena arena = arena_create();
     Memory mem = memory_new(&arena);
     TokenString tokens = tokenize(c->input, &arena);
+    assert(sanitize_tokens(&tokens) == CMD_EXPR);
     Expression expr = parse(tokens, &arena);
     display_expr(0, expr, &arena);
     ErrorString err = err_empty();
@@ -442,6 +448,7 @@ void test_evaluate_case(void *c_opaque) {
     Arena arena = arena_create();
     Memory mem = memory_new(&arena);
     TokenString tokens = tokenize(c->input, &arena);
+    assert(sanitize_tokens(&tokens) == CMD_EXPR);
     Expression expr = parse(tokens, &arena);
     ErrorString err = err_empty();
     assert(check_valid_expr(expr, &err, &arena));

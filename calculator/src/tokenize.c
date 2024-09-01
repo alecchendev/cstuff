@@ -227,6 +227,32 @@ TokenString tokenize(const char *input, Arena *arena) {
     return token_string;
 }
 
+typedef enum CommandType CommandType;
+enum CommandType {
+    CMD_QUIT,
+    CMD_HELP,
+    CMD_EMPTY,
+    CMD_EXPR,
+    CMD_INVALID,
+};
+
+CommandType sanitize_tokens(TokenString *tokens) {
+    if (tokens->length == 0) {
+        return CMD_EMPTY;
+    }
+    if (tokens->tokens[tokens->length - 1].type != TOK_END) {
+        return CMD_INVALID;
+    }
+    if (tokens->length == 2 && tokens->tokens[0].type == TOK_QUIT) {
+        return CMD_QUIT;
+    }
+    if (tokens->length == 2 && tokens->tokens[0].type == TOK_HELP) {
+        return CMD_HELP;
+    }
+    tokens->length -= 1; // Remove the end token
+    return CMD_EXPR;
+}
+
 void token_display(Token token) {
     switch (token.type) {
         case TOK_END:
@@ -274,6 +300,7 @@ void token_display(Token token) {
         case TOK_CARET:
             debug("Caret token\n");
             break;
+        default:
+            debug("Unknown token %d\n", token.type);
     }
-    debug("Unknown token\n");
 }

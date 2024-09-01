@@ -24,20 +24,28 @@ Unit aliases: n = kg m s^-2";
 
 bool execute_line(const char *input, char *output, size_t output_len, Memory *mem, Arena *repl_arena) {
     Arena arena = arena_create();
+    bool quit = false;
     TokenString tokens = tokenize(input, &arena);
+    CommandType cmd = sanitize_tokens(&tokens);
+    if (cmd == CMD_INVALID) {
+        memcpy(output, "Invalid input", 14);
+    } else if (cmd == CMD_EMPTY) {
+        memset(output, 0, output_len);
+    } else if (cmd == CMD_HELP) {
+        memcpy(output, help_msg, sizeof(help_msg));
+    } else if (cmd == CMD_QUIT) {
+        memset(output, 0, output_len);
+        quit = true;
+    }
+    if (cmd != CMD_EXPR) {
+        arena_free(&arena);
+        return quit;
+    }
     Expression expr = parse(tokens, &arena);
     display_expr(0, expr, &arena);
-    bool quit = false;
     ErrorString err = err_empty();
     if (!check_valid_expr(expr, &err, &arena)) {
         memcpy(output, err.msg, err.len);
-    } else if (expr.type == EXPR_EMPTY) {
-        memset(output, 0, output_len);
-    } else if (expr.type == EXPR_HELP) {
-        memcpy(output, help_msg, sizeof(help_msg));
-    } else if (expr.type == EXPR_QUIT) {
-        memset(output, 0, output_len);
-        quit = true;
     } else if (expr.type == EXPR_SET_VAR) {
         memset(output, 0, output_len);
         unsigned char * var_name = expr.expr.binary_expr.left->expr.var_name;
