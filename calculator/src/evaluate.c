@@ -3,9 +3,10 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include "parse.c"
+#include "memory.c"
 #include "unit.c"
 
-double evaluate(Expression expr, Arena *arena);
+double evaluate(Expression expr, Memory *mem, Arena *arena);
 
 typedef struct ErrorString ErrorString;
 struct ErrorString {
@@ -68,7 +69,10 @@ bool check_valid_expr(Expression expr, ErrorString *err, Arena *arena) {
     ExprType left_type = EXPR_INVALID;
     ExprType right_type = EXPR_INVALID;
     switch (expr.type) {
-        case EXPR_CONSTANT: case EXPR_UNIT: case EXPR_VAR:
+        case EXPR_CONSTANT: case EXPR_UNIT:
+            return true;
+        case EXPR_VAR:
+            // TODO: Check if variable is defined
             return true;
         case EXPR_NEG:
             right_type = expr.expr.unary_expr.right->type;
@@ -198,23 +202,30 @@ bool unit_convert_valid(Unit a, Unit b, ErrorString *err, Arena *arena) {
     return all_convertible;
 }
 
-Unit check_unit(Expression expr, ErrorString *err, Arena *arena) {
+Unit check_unit(Expression expr, Memory *mem, ErrorString *err, Arena *arena) {
     if (expr.type == EXPR_CONSTANT) {
         debug("constant: %lf\n", expr.expr.constant);
         return unit_new_none(arena);
     } else if (expr.type == EXPR_UNIT) {
         debug("unit: %s\n", unit_strings[expr.expr.unit_type]);
         return unit_new_single(expr.expr.unit_type, 1, arena);
+    } else if (expr.type == EXPR_VAR) {
+        debug("var: %s\n", expr.expr.var_name);
+        if (!memory_contains_var(mem, expr.expr.var_name)) {
+            return unit_new_unknown(arena);
+        }
+        Expression var_expr = memory_get_var(mem, expr.expr.var_name);
+        return check_unit(var_expr, mem, err, arena);
     } else if (expr.type == EXPR_NEG) {
         debug("neg\n");
-        return check_unit(*expr.expr.unary_expr.right, err, arena);
+        return check_unit(*expr.expr.unary_expr.right, mem, err, arena);
     } else if (expr.type == EXPR_EMPTY || expr.type == EXPR_QUIT || expr.type == EXPR_INVALID) {
         debug("empty, quit, or invalid, no unit: %d\n", expr.type);
         return unit_new_unknown(arena);
     }
 
-    Unit left = check_unit(*expr.expr.binary_expr.left, err, arena);
-    Unit right = check_unit(*expr.expr.binary_expr.right, err, arena);
+    Unit left = check_unit(*expr.expr.binary_expr.left, mem, err, arena);
+    Unit right = check_unit(*expr.expr.binary_expr.right, mem, err, arena);
     debug("left: %s, right: %s\n", display_unit(left, arena), display_unit(right, arena));
 
     Unit unit = unit_new_unknown(arena);
@@ -229,7 +240,7 @@ Unit check_unit(Expression expr, ErrorString *err, Arena *arena) {
             return unit_new_unknown(arena);
         }
         debug("pow: %s ^ %lf\n", display_unit(left, arena), expr.expr.binary_expr.right->expr.constant);
-        left.degrees[0] *= evaluate(*expr.expr.binary_expr.right, arena);
+        left.degrees[0] *= evaluate(*expr.expr.binary_expr.right, mem, arena);
         unit = left;
     } else if (expr.type == EXPR_CONVERT) {
         if (!unit_convert_valid(left, right, err, arena)) {
@@ -274,7 +285,7 @@ Unit check_unit(Expression expr, ErrorString *err, Arena *arena) {
     return unit;
 }
 
-double evaluate(Expression expr, Arena *arena) {
+double evaluate(Expression expr, Memory *mem, Arena *arena) {
     ErrorString err = err_empty();
     double left = 0;
     double right = 0;
@@ -283,30 +294,30 @@ double evaluate(Expression expr, Arena *arena) {
         case EXPR_CONSTANT:
             return expr.expr.constant;
         case EXPR_VAR:
-            assert(false); // TODO
+            return evaluate(memory_get_var(mem, expr.expr.var_name), mem, arena);
         case EXPR_POW: // Pow only means unit degrees for now
         case EXPR_UNIT:
         case EXPR_COMP_UNIT:
         case EXPR_DIV_UNIT:
             return 0;
         case EXPR_NEG:
-            return -evaluate(*expr.expr.unary_expr.right, arena);
+            return -evaluate(*expr.expr.unary_expr.right, mem, arena);
         case EXPR_CONST_UNIT:
-            return evaluate(*expr.expr.binary_expr.left, arena);
+            return evaluate(*expr.expr.binary_expr.left, mem, arena);
         case EXPR_SET_VAR:
             assert(false);
         case EXPR_ADD: case EXPR_SUB: case EXPR_MUL: case EXPR_DIV:
-            left_unit = check_unit(*expr.expr.binary_expr.left, &err, arena);
-            right_unit = check_unit(*expr.expr.binary_expr.right, &err, arena);
-            left = evaluate(*expr.expr.binary_expr.left, arena);
-            right = evaluate(*expr.expr.binary_expr.right, arena);
+            left_unit = check_unit(*expr.expr.binary_expr.left, mem, &err, arena);
+            right_unit = check_unit(*expr.expr.binary_expr.right, mem, &err, arena);
+            left = evaluate(*expr.expr.binary_expr.left, mem, arena);
+            right = evaluate(*expr.expr.binary_expr.right, mem, arena);
             break;
         case EXPR_CONVERT:
             // TODO: Return a unit tree from check_unit so we don't have to run this
             // (and allocate memory) again?
-            left_unit = check_unit(*expr.expr.binary_expr.left, &err, arena);
-            right_unit = check_unit(*expr.expr.binary_expr.right, &err, arena);
-            left = evaluate(*expr.expr.binary_expr.left, arena);
+            left_unit = check_unit(*expr.expr.binary_expr.left, mem, &err, arena);
+            right_unit = check_unit(*expr.expr.binary_expr.right, mem, &err, arena);
+            left = evaluate(*expr.expr.binary_expr.left, mem, arena);
             return left * unit_convert_factor(left_unit, right_unit, arena);
         case EXPR_EMPTY: case EXPR_QUIT: case EXPR_HELP: case EXPR_INVALID:
             assert(false);

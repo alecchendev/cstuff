@@ -4,10 +4,12 @@
 #include <string.h>
 #include <unistd.h>
 #include <termios.h>
+#include "arena.c"
 #include "evaluate.c"
+#include "expression.c"
+#include "memory.c"
 #include "parse.c"
 #include "tokenize.c"
-#include "arena.c"
 
 // TODO: more math, everything relating to a stored memory
 const char help_msg[] = "Hello! Here's some stuff you can do:\n\
@@ -20,7 +22,7 @@ Variables: x = 9 + 10\n\
 Custom units: 1 pentameter -> 5 m\n\
 Unit aliases: n = kg m s^-2";
 
-bool execute_line(const char *input, char *output, size_t output_len) {
+bool execute_line(const char *input, char *output, size_t output_len, Memory *mem, Arena *repl_arena) {
     Arena arena = arena_create();
     TokenString tokens = tokenize(input, &arena);
     Expression expr = parse(tokens, &arena);
@@ -36,12 +38,26 @@ bool execute_line(const char *input, char *output, size_t output_len) {
     } else if (expr.type == EXPR_QUIT) {
         memset(output, 0, output_len);
         quit = true;
-    } else {
-        Unit unit = check_unit(expr, &err, &arena);
+    } else if (expr.type == EXPR_SET_VAR) {
+        memset(output, 0, output_len);
+        unsigned char * var_name = expr.expr.binary_expr.left->expr.var_name;
+        Expression value = *expr.expr.binary_expr.right;
+        Unit unit = check_unit(value, mem, &err, &arena);
         if (is_unit_unknown(unit)) {
             memcpy(output, err.msg, err.len);
         } else {
-            double result = evaluate(expr, &arena);
+            double result = evaluate(value, mem, &arena);
+            // TODO: do a simplifying pass that will make this better
+            // + fix the issue of recursive definition (e.g. x = x + 1)
+            memory_add_var(mem, var_name, value, repl_arena);
+            snprintf(output, output_len, "%s = %lf %s", var_name, result, display_unit(unit, &arena));
+        }
+    } else {
+        Unit unit = check_unit(expr, mem, &err, &arena);
+        if (is_unit_unknown(unit)) {
+            memcpy(output, err.msg, err.len);
+        } else {
+            double result = evaluate(expr, mem, &arena);
             snprintf(output, output_len, "%lf %s", result, display_unit(unit, &arena));
         }
     }
@@ -159,9 +175,11 @@ void repl(FILE *input_fd) {
         exit(1); // TODO handle differently?
     }
 
-    Arena history_arena = arena_create();
+    Arena repl_arena = arena_create();
     History history = { .history = NULL, .len = 0, .pos = 0 };
-    history.history = arena_alloc(&history_arena, sizeof(Input) * MAX_HISTORY);
+    history.history = arena_alloc(&repl_arena, sizeof(Input) * MAX_HISTORY);
+
+    Memory memory = memory_new(&repl_arena);
 
     bool done = false;
     while (!done) {
@@ -215,7 +233,7 @@ void repl(FILE *input_fd) {
             continue;
         }
         char output[512] = {0};
-        done = execute_line(input.data, output, sizeof(output));
+        done = execute_line(input.data, output, sizeof(output), &memory, &repl_arena);
         if (strnlen(output, sizeof(output)) > 0) printf("%s\n", output);
 
         if (history.len > 0 && strncmp(input.data, history.history[history.len - 1].data, MAX_INPUT) == 0) {
@@ -234,6 +252,6 @@ void repl(FILE *input_fd) {
         }
         history.pos = history.len;
     }
-    arena_free(&history_arena);
+    arena_free(&repl_arena);
 }
 

@@ -5,6 +5,7 @@
 #include "arena.c"
 #include "evaluate.c"
 #include "hash_map.c"
+#include "memory.c"
 #include "parse.c"
 #include "tokenize.c"
 #include "debug.c"
@@ -370,12 +371,13 @@ typedef struct {
 void test_check_unit_case(void *c_opaque) {
     CheckUnitCase *c = (CheckUnitCase *)c_opaque;
     Arena arena = arena_create();
+    Memory mem = memory_new(&arena);
     TokenString tokens = tokenize(c->input, &arena);
     Expression expr = parse(tokens, &arena);
     display_expr(0, expr, &arena);
     ErrorString err = err_empty();
     /*assert(check_valid_expr(expr, &err, &arena));*/
-    Unit unit = check_unit(expr, &err, &arena);
+    Unit unit = check_unit(expr, &mem, &err, &arena);
     assert(units_equal(unit, c->expected, &arena));
     arena_free(&arena);
 }
@@ -438,12 +440,13 @@ typedef struct {
 void test_evaluate_case(void *c_opaque) {
     EvaluateCase *c = (EvaluateCase *)c_opaque;
     Arena arena = arena_create();
+    Memory mem = memory_new(&arena);
     TokenString tokens = tokenize(c->input, &arena);
     Expression expr = parse(tokens, &arena);
     ErrorString err = err_empty();
     assert(check_valid_expr(expr, &err, &arena));
-    assert(!is_unit_unknown(check_unit(expr, &err, &arena)));
-    double result = evaluate(expr, &arena);
+    assert(!is_unit_unknown(check_unit(expr, &mem, &err, &arena)));
+    double result = evaluate(expr, &mem, &arena);
     debug("Expected: %f, got: %f\n", c->expected, result);
     assert(eq_diff(result, c->expected));
     arena_free(&arena);
