@@ -51,11 +51,19 @@ bool left_associative(TokenType op, size_t idx, bool prev_is_bin_op) {
     return false;
 }
 
+bool token_is_unit(Token token, Memory mem) {
+    return token.type == TOK_UNIT ||
+        (token.type == TOK_VAR &&
+        memory_contains_var(&mem, token.var_name) &&
+        expr_is_unit(memory_get_var(&mem, token.var_name).type));
+}
+
 // Only time this should return EXPR_INVALID
 // is if we've run into an invalid token, OR
 // if we use equals in the wrong way, e.g. x = 1 + 2
 Expression parse(TokenString tokens, Memory mem, Arena *arena) {
     debug("Parsing expression\n");
+    debug("Tokens: %zu\n", tokens.length);
     for (size_t i = 0; i < tokens.length; i++) {
         token_display(tokens.tokens[i]);
     }
@@ -100,15 +108,13 @@ Expression parse(TokenString tokens, Memory mem, Arena *arena) {
     int best_precedence = 0;
     for (size_t i = 0; i < tokens.length; i++) {
         bool prev_is_bin_op = i == 0 ? false : is_bin_op(tokens.tokens[i - 1].type);
-        bool next_is_unit = i != tokens.length - 1 &&
-            (tokens.tokens[i + 1].type == TOK_UNIT ||
-            (tokens.tokens[i + 1].type == TOK_VAR &&
-                memory_contains_var(&mem, tokens.tokens[i + 1].var_name) &&
-                expr_is_unit(memory_get_var(&mem, tokens.tokens[i + 1].var_name).type)));
+        bool next_is_unit = i != tokens.length - 1 && token_is_unit(tokens.tokens[i + 1], mem);
+        debug("i: %zu Next_is_unit: %d\n", i, next_is_unit);
         int curr_precedence = precedence(tokens.tokens[i].type, i, prev_is_bin_op, next_is_unit);
         bool curr_left_assoc = left_associative(tokens.tokens[i].type, i, prev_is_bin_op);
         if (curr_precedence > best_precedence || (curr_precedence == best_precedence && curr_left_assoc)) {
-            debug("Found higher precedence: %d at idx: %zu\n", tokens.tokens[i].type, i);
+            debug("Found higher precedence: %d token type %d at idx: %zu\n",
+                curr_precedence, tokens.tokens[i].type, i);
             op_idx = i;
             best_precedence = curr_precedence;
         }
@@ -134,7 +140,7 @@ Expression parse(TokenString tokens, Memory mem, Arena *arena) {
         type = EXPR_SUB;
     } else if (op == TOK_MUL) {
         type = EXPR_MUL;
-    } else if (op == TOK_DIV && (op_idx == tokens.length - 1 || tokens.tokens[op_idx + 1].type != TOK_UNIT)) {
+    } else if (op == TOK_DIV && (op_idx == tokens.length - 1 || !token_is_unit(tokens.tokens[op_idx + 1], mem))) {
         type = EXPR_DIV;
     } else if (op == TOK_DIV) {
         type = EXPR_DIV_UNIT;

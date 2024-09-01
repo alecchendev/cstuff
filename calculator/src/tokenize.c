@@ -274,6 +274,7 @@ void token_display(Token token) {
         case TOK_CARET:
             debug("Caret token\n");
             break;
+        default:
+            debug("Unknown token\n");
     }
-    debug("Unknown token\n");
 }
