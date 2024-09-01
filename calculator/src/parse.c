@@ -58,8 +58,19 @@ Expression parse(TokenString tokens, Arena *arena) {
         token_display(tokens.tokens[i]);
     }
     if (tokens.length == 0) {
-        debug("Empty expression\n");
-        return invalid_expr;
+        debug("empty\n");
+        return empty_expr;
+    }
+    if (tokens.length > 0 && tokens.tokens[tokens.length - 1].type == TOK_END) {
+        return parse((TokenString) { .tokens = tokens.tokens, .length = tokens.length - 1}, arena);
+    }
+    if (tokens.length == 1 && tokens.tokens[0].type == TOK_QUIT) {
+        debug("quit\n");
+        return quit_expr;
+    }
+    if (tokens.length == 1 && tokens.tokens[0].type == TOK_HELP) {
+        debug("help\n");
+        return help_expr;
     }
     if (tokens.length == 1 && tokens.tokens[0].type == TOK_UNIT) {
         debug("unit\n");
