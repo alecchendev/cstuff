@@ -161,10 +161,10 @@ bool check_valid_expr(Expression expr, ErrorString *err, Arena *arena) {
     }
 }
 
-const char none_convert_msg[] = "Convert invalid: one unit is none but not the other: Left: %s Right: %s";
-const char unknown_convert_msg[] = "Convert invalid, unknown units: Left: %s Right: %s";
-const char neq_length_msg[] = "Convert invalid: lengths not equal: Left: %s Right: %s";
-const char general_bad_convert_msg[] = "Convert invalid: Left: %s Right %s";
+const char none_convert_msg[] = "Convert invalid: one unit is none but not the other: From: %s To: %s";
+const char unknown_convert_msg[] = "Convert invalid, unknown units: From: %s To: %s";
+const char neq_length_msg[] = "Convert invalid: lengths not equal: From: %s To: %s";
+const char general_bad_convert_msg[] = "Convert invalid: From: %s To %s";
 
 bool unit_convert_valid(Unit a, Unit b, ErrorString *err, Arena *arena) {
     if (is_unit_none(a) != is_unit_none(b)) {
@@ -212,6 +212,7 @@ Unit check_unit(Expression expr, Memory *mem, ErrorString *err, Arena *arena) {
     } else if (expr.type == EXPR_VAR) {
         debug("var: %s\n", expr.expr.var_name);
         if (!memory_contains_var(mem, expr.expr.var_name)) {
+            *err = err_new(arena, "Variable not defined: %s", expr.expr.var_name);
             return unit_new_unknown(arena);
         }
         Expression var_expr = memory_get_var(mem, expr.expr.var_name);
