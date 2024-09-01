@@ -68,8 +68,8 @@ void hash_map_insert_alloc(HashMap *map, const unsigned char *key, void *value, 
         map->items[idx].value = arena_alloc(arena, map->value_size);
         memcpy(map->items[idx].value, value, map->value_size);
     }
+    map->size += !map->exists[idx]; // Only increment if key not already there
     map->exists[idx] = true;
-    map->size += 1;
 }
 
 void hash_map_resize(HashMap *map, size_t new_capacity, Arena *arena) {

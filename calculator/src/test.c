@@ -580,6 +580,14 @@ void test_hash_map_int(void *_) {
     assert_eq(*(int *)hash_map_get(&map, key2), val2);
     assert_eq(*(int *)hash_map_get(&map, key3), val3);
     assert_eq(*(int *)hash_map_get(&map, key4), val4);
+
+    int val1_replace = 5;
+    hash_map_insert(&map, key1, (void *)&val1_replace, &arena);
+
+    assert_eq(map.capacity, 8);
+    assert_eq(map.size, 4);
+    assert(hash_map_contains(&map, key1));
+    assert_eq(*(int *)hash_map_get(&map, key1), val1_replace);
 }
 
 typedef struct TestStruct TestStruct;
