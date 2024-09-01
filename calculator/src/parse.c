@@ -5,6 +5,7 @@
 #include "tokenize.c"
 #include "arena.c"
 #include "debug.c"
+#include "memory.c"
 
 bool is_bin_op(TokenType type) {
     switch (type) {
@@ -52,7 +53,7 @@ bool left_associative(TokenType op, size_t idx, bool prev_is_bin_op) {
 
 // Only time this should return EXPR_INVALID
 // is if we've run into an invalid token
-Expression parse(TokenString tokens, Arena *arena) {
+Expression parse(TokenString tokens, Memory mem, Arena *arena) {
     debug("Parsing expression\n");
     for (size_t i = 0; i < tokens.length; i++) {
         token_display(tokens.tokens[i]);
@@ -62,7 +63,7 @@ Expression parse(TokenString tokens, Arena *arena) {
         return empty_expr;
     }
     if (tokens.length > 0 && tokens.tokens[tokens.length - 1].type == TOK_END) {
-        return parse((TokenString) { .tokens = tokens.tokens, .length = tokens.length - 1}, arena);
+        return parse((TokenString) { .tokens = tokens.tokens, .length = tokens.length - 1}, mem, arena);
     }
     if (tokens.length == 1 && tokens.tokens[0].type == TOK_QUIT) {
         debug("quit\n");
@@ -81,7 +82,11 @@ Expression parse(TokenString tokens, Arena *arena) {
         return expr_new_const(tokens.tokens[0].number);
     }
     if (tokens.length == 1 && tokens.tokens[0].type == TOK_VAR) {
-        debug("variable\n");
+        if (memory_contains_var(&mem, tokens.tokens[0].var_name)) {
+            debug("known variable\n");
+            return memory_get_var(&mem, tokens.tokens[0].var_name);
+        }
+        debug("unknown variable\n");
         return expr_new_var(tokens.tokens[0].var_name, arena);
     }
     if (tokens.length == 1) {
@@ -94,7 +99,11 @@ Expression parse(TokenString tokens, Arena *arena) {
     int best_precedence = 0;
     for (size_t i = 0; i < tokens.length; i++) {
         bool prev_is_bin_op = i == 0 ? false : is_bin_op(tokens.tokens[i - 1].type);
-        bool next_is_unit = i == tokens.length - 1 ? false : tokens.tokens[i + 1].type == TOK_UNIT;
+        bool next_is_unit = i != tokens.length - 1 &&
+            (tokens.tokens[i + 1].type == TOK_UNIT ||
+            (tokens.tokens[i + 1].type == TOK_VAR &&
+                memory_contains_var(&mem, tokens.tokens[i + 1].var_name) &&
+                expr_is_unit(memory_get_var(&mem, tokens.tokens[i + 1].var_name).type)));
         int curr_precedence = precedence(tokens.tokens[i].type, i, prev_is_bin_op, next_is_unit);
         bool curr_left_assoc = left_associative(tokens.tokens[i].type, i, prev_is_bin_op);
         if (curr_precedence > best_precedence || (curr_precedence == best_precedence && curr_left_assoc)) {
@@ -107,14 +116,16 @@ Expression parse(TokenString tokens, Arena *arena) {
 
     if (op == TOK_SUB && op_idx == 0) {
         TokenString right_tokens = (TokenString) { .tokens = tokens.tokens + 1, .length = tokens.length - 1};
-        Expression right = parse(right_tokens, arena);
+        Expression right = parse(right_tokens, mem, arena);
         return expr_new_neg(right, arena);
+    } else if (op == TOK_EQUALS && op_idx == 1) {
+        TokenString right_tokens = (TokenString) { .tokens = tokens.tokens + 2, .length = tokens.length - 2};
+        Expression right = parse(right_tokens, mem, arena);
+        return expr_new_bin(EXPR_SET_VAR, expr_new_var(tokens.tokens[0].var_name, arena), right, arena);
     }
 
     ExprType type;
-    if (op == TOK_EQUALS) {
-        type = EXPR_SET_VAR;
-    } else if (op == TOK_CONVERT) {
+    if (op == TOK_CONVERT) {
         type = EXPR_CONVERT;
     } else if (op == TOK_ADD) {
         type = EXPR_ADD;
@@ -148,7 +159,7 @@ Expression parse(TokenString tokens, Arena *arena) {
     // Assert idxs are within 0 and tokens.length
     TokenString left_tokens = { .tokens = tokens.tokens, .length = left_end_idx };
     TokenString right_tokens = { .tokens = tokens.tokens + right_start_idx, .length = tokens.length - right_start_idx };
-    Expression left = parse(left_tokens, arena);
-    Expression right = parse(right_tokens, arena);
+    Expression left = parse(left_tokens, mem, arena);
+    Expression right = parse(right_tokens, mem, arena);
     return expr_new_bin(type, left, right, arena);
 }

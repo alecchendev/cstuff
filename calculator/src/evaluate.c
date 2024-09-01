@@ -275,6 +275,7 @@ Unit check_unit(Expression expr, Memory *mem, ErrorString *err, Arena *arena) {
         }
     } else if (expr.type == EXPR_DIV || expr.type == EXPR_DIV_UNIT) {
         debug("dividing units\n");
+        // TODO: reject div unit for same category
         Unit right_dup = unit_new(right.types, right.degrees, right.length, arena);
         for (size_t i = 0; i < right_dup.length; i++) {
             right_dup.degrees[i] *= -1;

@@ -74,9 +74,14 @@ Expression expr_new_const(double value) {
     return (Expression) { .type = EXPR_CONSTANT, .expr = { .constant = value }};
 }
 
+Expression expr_new_unit_full(Unit unit, Arena *arena) {
+    // Duplicate to avoid mismatched unit x expression lifetime
+    Unit unit_dup = unit_new(unit.types, unit.degrees, unit.length, arena);
+    return (Expression) { .type = EXPR_UNIT, .expr = { .unit = unit_dup }};
+}
+
 Expression expr_new_unit(UnitType unit_type, Arena *arena) {
-    return (Expression) { .type = EXPR_UNIT,
-        .expr = { .unit = unit_new_single(unit_type, 1, arena) }};
+    return expr_new_unit_full(unit_new_single(unit_type, 1, arena), arena);
 }
 
 Expression expr_new_neg(Expression right_value, Arena *arena) {
@@ -110,19 +115,22 @@ bool expr_is_unit(ExprType type) {
         case EXPR_UNIT: case EXPR_COMP_UNIT: case EXPR_POW: case EXPR_DIV_UNIT:
             return true;
         case EXPR_CONSTANT: case EXPR_NEG: case EXPR_CONST_UNIT: case EXPR_VAR:
-        case EXPR_ADD: case EXPR_SUB: case EXPR_MUL: case EXPR_DIV: case EXPR_CONVERT:
-        case EXPR_SET_VAR: case EXPR_EMPTY: case EXPR_QUIT: case EXPR_HELP: case EXPR_INVALID:
+        case EXPR_ADD: case EXPR_SUB: case EXPR_MUL:
+        case EXPR_DIV: case EXPR_CONVERT: case EXPR_SET_VAR: case EXPR_EMPTY:
+        case EXPR_QUIT: case EXPR_HELP: case EXPR_INVALID:
             return false;
     }
 }
 
 bool expr_is_number(ExprType type) {
     switch (type) {
-        case EXPR_CONSTANT: case EXPR_NEG: case EXPR_CONST_UNIT: case EXPR_VAR:
-        case EXPR_ADD: case EXPR_SUB: case EXPR_MUL: case EXPR_DIV: case EXPR_CONVERT:
+        case EXPR_CONSTANT: case EXPR_NEG: case EXPR_CONST_UNIT:
+        case EXPR_ADD: case EXPR_SUB: case EXPR_MUL:
+        case EXPR_DIV: case EXPR_CONVERT:
             return true;
-        case EXPR_UNIT: case EXPR_COMP_UNIT: case EXPR_POW: case EXPR_SET_VAR: case EXPR_DIV_UNIT:
-        case EXPR_EMPTY: case EXPR_QUIT: case EXPR_HELP: case EXPR_INVALID:
+        case EXPR_UNIT: case EXPR_COMP_UNIT: case EXPR_POW: case EXPR_SET_VAR:
+        case EXPR_VAR: case EXPR_DIV_UNIT: case EXPR_EMPTY: case EXPR_QUIT:
+        case EXPR_HELP: case EXPR_INVALID:
             return false;
     }
 }

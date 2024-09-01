@@ -210,8 +210,9 @@ bool exprs_equal(Expression a, Expression b, Arena *arena) {
 void test_parse_case(void *c_opaque) {
     ParseCase *c = (ParseCase *)c_opaque;
     Arena arena = arena_create();
+    Memory mem = memory_new(&arena);
     TokenString tokens = tokenize(c->input, &arena);
-    Expression expr = parse(tokens, &arena);
+    Expression expr = parse(tokens, mem, &arena);
     debug("input: %s\n", c->input);
     debug("Expected:\n");
     display_expr(0, c->expected, &arena);
@@ -329,8 +330,9 @@ typedef struct {
 void test_invalid_expr_case(void *c_opaque) {
     InvalidExprCase *c = (InvalidExprCase *)c_opaque;
     Arena arena = arena_create();
+    Memory mem = memory_new(&arena);
     TokenString tokens = tokenize(c->input, &arena);
-    Expression expr = parse(tokens, &arena);
+    Expression expr = parse(tokens, mem, &arena);
     ErrorString err = err_empty();
     assert(!check_valid_expr(expr, &err, &arena));
     arena_free(&arena);
@@ -374,7 +376,7 @@ void test_check_unit_case(void *c_opaque) {
     Arena arena = arena_create();
     Memory mem = memory_new(&arena);
     TokenString tokens = tokenize(c->input, &arena);
-    Expression expr = parse(tokens, &arena);
+    Expression expr = parse(tokens, mem, &arena);
     display_expr(0, expr, &arena);
     ErrorString err = err_empty();
     /*assert(check_valid_expr(expr, &err, &arena));*/
@@ -443,7 +445,8 @@ void test_evaluate_case(void *c_opaque) {
     Arena arena = arena_create();
     Memory mem = memory_new(&arena);
     TokenString tokens = tokenize(c->input, &arena);
-    Expression expr = parse(tokens, &arena);
+    Expression expr = parse(tokens, mem, &arena);
+    display_expr(0, expr, &arena);
     ErrorString err = err_empty();
     assert(check_valid_expr(expr, &err, &arena));
     assert(!is_unit_unknown(check_unit(expr, &mem, &err, &arena)));

@@ -25,7 +25,7 @@ Unit aliases: n = kg m s^-2";
 bool execute_line(const char *input, char *output, size_t output_len, Memory *mem, Arena *repl_arena) {
     Arena arena = arena_create();
     TokenString tokens = tokenize(input, &arena);
-    Expression expr = parse(tokens, &arena);
+    Expression expr = parse(tokens, *mem, &arena);
     display_expr(0, expr, &arena);
     bool quit = false;
     ErrorString err = err_empty();
@@ -49,6 +49,8 @@ bool execute_line(const char *input, char *output, size_t output_len, Memory *me
             double result = evaluate(value, mem, &arena);
             // TODO: do a simplifying pass that will make this better
             // + fix the issue of recursive definition (e.g. x = x + 1)
+            value = expr_new_const_unit(result, expr_new_unit_full(unit, repl_arena),
+                repl_arena);
             memory_add_var(mem, var_name, value, repl_arena);
             snprintf(output, output_len, "%s = %lf %s", var_name, result, display_unit(unit, &arena));
         }
