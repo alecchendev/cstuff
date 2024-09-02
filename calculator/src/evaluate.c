@@ -6,7 +6,7 @@
 #include "memory.c"
 #include "unit.c"
 
-double evaluate(Expression expr, Memory *mem, Arena *arena);
+double evaluate(Expression expr, Memory mem, Arena *arena);
 
 typedef struct ErrorString ErrorString;
 struct ErrorString {
@@ -46,7 +46,7 @@ ErrorString err_new(Arena *arena, const char *fmt, ...) {
     return err;
 }
 
-void substitute_variables(Expression *expr, Memory *mem) {
+void substitute_variables(Expression *expr, Memory mem) {
     if (expr->type == EXPR_VAR && memory_contains_var(mem, expr->expr.var_name)) {
         *expr = memory_get_var(mem, expr->expr.var_name);
     } else if (expr->type == EXPR_SET_VAR) {
@@ -213,7 +213,7 @@ bool unit_convert_valid(Unit a, Unit b, ErrorString *err, Arena *arena) {
     return all_convertible;
 }
 
-Unit check_unit(Expression expr, Memory *mem, ErrorString *err, Arena *arena) {
+Unit check_unit(Expression expr, Memory mem, ErrorString *err, Arena *arena) {
     if (expr.type == EXPR_CONSTANT) {
         debug("constant: %lf\n", expr.expr.constant);
         return unit_new_none(arena);
@@ -300,7 +300,7 @@ Unit check_unit(Expression expr, Memory *mem, ErrorString *err, Arena *arena) {
     return unit;
 }
 
-double evaluate(Expression expr, Memory *mem, Arena *arena) {
+double evaluate(Expression expr, Memory mem, Arena *arena) {
     ErrorString err = err_empty();
     double left = 0;
     double right = 0;

@@ -380,7 +380,7 @@ void test_check_unit_case(void *c_opaque) {
     display_expr(0, expr, &arena);
     ErrorString err = err_empty();
     /*assert(check_valid_expr(expr, &err, &arena));*/
-    Unit unit = check_unit(expr, &mem, &err, &arena);
+    Unit unit = check_unit(expr, mem, &err, &arena);
     assert(units_equal(unit, c->expected, &arena));
     arena_free(&arena);
 }
@@ -449,8 +449,8 @@ void test_evaluate_case(void *c_opaque) {
     display_expr(0, expr, &arena);
     ErrorString err = err_empty();
     assert(check_valid_expr(expr, &err, &arena));
-    assert(!is_unit_unknown(check_unit(expr, &mem, &err, &arena)));
-    double result = evaluate(expr, &mem, &arena);
+    assert(!is_unit_unknown(check_unit(expr, mem, &err, &arena)));
+    double result = evaluate(expr, mem, &arena);
     debug("Expected: %f, got: %f\n", c->expected, result);
     assert(eq_diff(result, c->expected));
     arena_free(&arena);

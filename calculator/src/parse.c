@@ -54,8 +54,8 @@ bool left_associative(TokenType op, size_t idx, bool prev_is_bin_op) {
 bool token_is_unit(Token token, Memory mem) {
     return token.type == TOK_UNIT ||
         (token.type == TOK_VAR &&
-        memory_contains_var(&mem, token.var_name) &&
-        expr_is_unit(memory_get_var(&mem, token.var_name).type));
+        memory_contains_var(mem, token.var_name) &&
+        expr_is_unit(memory_get_var(mem, token.var_name).type));
 }
 
 // Only time this should return EXPR_INVALID
