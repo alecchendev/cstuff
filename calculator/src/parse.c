@@ -91,11 +91,7 @@ Expression parse(TokenString tokens, Memory mem, Arena *arena) {
         return expr_new_const(tokens.tokens[0].number);
     }
     if (tokens.length == 1 && tokens.tokens[0].type == TOK_VAR) {
-        if (memory_contains_var(&mem, tokens.tokens[0].var_name)) {
-            debug("known variable\n");
-            return memory_get_var(&mem, tokens.tokens[0].var_name);
-        }
-        debug("unknown variable\n");
+        debug("variable\n");
         return expr_new_var(tokens.tokens[0].var_name, arena);
     }
     if (tokens.length == 1) {
@@ -125,10 +121,6 @@ Expression parse(TokenString tokens, Memory mem, Arena *arena) {
         TokenString right_tokens = (TokenString) { .tokens = tokens.tokens + 1, .length = tokens.length - 1};
         Expression right = parse(right_tokens, mem, arena);
         return expr_new_neg(right, arena);
-    } else if (op == TOK_EQUALS && op_idx == 1) {
-        TokenString right_tokens = (TokenString) { .tokens = tokens.tokens + 2, .length = tokens.length - 2};
-        Expression right = parse(right_tokens, mem, arena);
-        return expr_new_bin(EXPR_SET_VAR, expr_new_var(tokens.tokens[0].var_name, arena), right, arena);
     }
 
     ExprType type;
@@ -150,6 +142,8 @@ Expression parse(TokenString tokens, Memory mem, Arena *arena) {
         type = EXPR_COMP_UNIT;
     } else if (op == TOK_CARET) {
         type = EXPR_POW;
+    } else if (op == TOK_EQUALS) {
+        type = EXPR_SET_VAR;
     } else {
         return invalid_expr;
     }

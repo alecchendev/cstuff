@@ -46,6 +46,19 @@ ErrorString err_new(Arena *arena, const char *fmt, ...) {
     return err;
 }
 
+void substitute_variables(Expression *expr, Memory *mem) {
+    if (expr->type == EXPR_VAR && memory_contains_var(mem, expr->expr.var_name)) {
+        *expr = memory_get_var(mem, expr->expr.var_name);
+    } else if (expr->type == EXPR_SET_VAR) {
+        substitute_variables(expr->expr.binary_expr.right, mem);
+    } else if (expr->type == EXPR_NEG) {
+        substitute_variables(expr->expr.unary_expr.right, mem);
+    } else if (expr_is_bin(expr->type)) {
+        substitute_variables(expr->expr.binary_expr.left, mem);
+        substitute_variables(expr->expr.binary_expr.right, mem);
+    }
+}
+
 // While these are helpful sometimes,
 // there are cases where the error requires
 // more knowledge of our parse tree. E.g. "1 / km".
@@ -53,7 +66,7 @@ ErrorString err_new(Arena *arena, const char *fmt, ...) {
 // like this. TODO: show user the block of tokens
 // where they messed up, and it'll probably be
 // obvious.
-const char invalid_expr_msg[] = "Invalid expression";
+const char invalid_expr_msg[] = "Invalid expression, unknown reason";
 const char invalid_neg_msg[] = "Negation expected right side to be constant, negation, or constant with unit, instead got: %s";
 const char invalid_const_unit_msg[] = "Expected to combine constant with unit, instead got left: %s right: %s";
 const char invalid_div_unit_msg[] = "Expected to divide two units, instead got left: %s right: %s";
@@ -69,10 +82,7 @@ bool check_valid_expr(Expression expr, ErrorString *err, Arena *arena) {
     ExprType left_type = EXPR_INVALID;
     ExprType right_type = EXPR_INVALID;
     switch (expr.type) {
-        case EXPR_CONSTANT: case EXPR_UNIT:
-            return true;
-        case EXPR_VAR:
-            // TODO: Check if variable is defined
+        case EXPR_CONSTANT: case EXPR_UNIT: case EXPR_VAR:
             return true;
         case EXPR_NEG:
             right_type = expr.expr.unary_expr.right->type;

@@ -26,6 +26,7 @@ bool execute_line(const char *input, char *output, size_t output_len, Memory *me
     Arena arena = arena_create();
     TokenString tokens = tokenize(input, &arena);
     Expression expr = parse(tokens, *mem, &arena);
+    substitute_variables(&expr, mem);
     display_expr(0, expr, &arena);
     bool quit = false;
     ErrorString err = err_empty();

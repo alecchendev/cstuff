@@ -110,6 +110,18 @@ Expression expr_new_unit_comp(Expression unit_expr_1, Expression unit_expr_2, Ar
     return expr_new_bin(EXPR_COMP_UNIT, unit_expr_1, unit_expr_2, arena);
 }
 
+bool expr_is_bin(ExprType type) {
+    switch (type) {
+        case EXPR_CONSTANT: case EXPR_UNIT: case EXPR_NEG: case EXPR_VAR:
+        case EXPR_EMPTY: case EXPR_QUIT: case EXPR_HELP: case EXPR_INVALID:
+            return false;
+        case EXPR_CONST_UNIT: case EXPR_COMP_UNIT: case EXPR_DIV_UNIT:
+        case EXPR_ADD: case EXPR_SUB: case EXPR_MUL: case EXPR_DIV:
+        case EXPR_CONVERT: case EXPR_POW: case EXPR_SET_VAR:
+            return true;
+    }
+}
+
 bool expr_is_unit(ExprType type) {
     switch (type) {
         case EXPR_UNIT: case EXPR_COMP_UNIT: case EXPR_POW: case EXPR_DIV_UNIT:
