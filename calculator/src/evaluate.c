@@ -6,7 +6,6 @@
 #include "memory.c"
 #include "unit.c"
 
-double evaluate(Expression expr, Memory mem, Arena *arena);
 
 typedef struct ErrorString ErrorString;
 struct ErrorString {
@@ -213,6 +212,8 @@ bool unit_convert_valid(Unit a, Unit b, ErrorString *err, Arena *arena) {
     return all_convertible;
 }
 
+double evaluate(Expression expr, Memory mem, ErrorString *err, Arena *arena);
+
 Unit check_unit(Expression expr, Memory mem, ErrorString *err, Arena *arena) {
     if (expr.type == EXPR_CONSTANT) {
         debug("constant: %lf\n", expr.expr.constant);
@@ -253,7 +254,7 @@ Unit check_unit(Expression expr, Memory mem, ErrorString *err, Arena *arena) {
         }
         debug("pow: %s ^ %lf\n", display_unit(left, arena), expr.expr.binary_expr.right->expr.constant);
         Unit left_dup = unit_new(left.types, left.degrees, left.length, arena);
-        left_dup.degrees[0] *= evaluate(*expr.expr.binary_expr.right, mem, arena);
+        left_dup.degrees[0] *= evaluate(*expr.expr.binary_expr.right, mem, err, arena);
         unit = left_dup;
     } else if (expr.type == EXPR_CONVERT) {
         if (!unit_convert_valid(left, right, err, arena)) {
@@ -300,8 +301,7 @@ Unit check_unit(Expression expr, Memory mem, ErrorString *err, Arena *arena) {
     return unit;
 }
 
-double evaluate(Expression expr, Memory mem, Arena *arena) {
-    ErrorString err = err_empty();
+double evaluate(Expression expr, Memory mem, ErrorString *err, Arena *arena) {
     double left = 0;
     double right = 0;
     Unit left_unit, right_unit;
@@ -309,30 +309,30 @@ double evaluate(Expression expr, Memory mem, Arena *arena) {
         case EXPR_CONSTANT:
             return expr.expr.constant;
         case EXPR_VAR:
-            return evaluate(memory_get_var(mem, expr.expr.var_name), mem, arena);
+            return evaluate(memory_get_var(mem, expr.expr.var_name), mem, err, arena);
         case EXPR_POW: // Pow only means unit degrees for now
         case EXPR_UNIT:
         case EXPR_COMP_UNIT:
         case EXPR_DIV_UNIT:
             return 0;
         case EXPR_NEG:
-            return -evaluate(*expr.expr.unary_expr.right, mem, arena);
+            return -evaluate(*expr.expr.unary_expr.right, mem, err, arena);
         case EXPR_CONST_UNIT:
-            return evaluate(*expr.expr.binary_expr.left, mem, arena);
+            return evaluate(*expr.expr.binary_expr.left, mem, err, arena);
         case EXPR_SET_VAR:
             assert(false);
         case EXPR_ADD: case EXPR_SUB: case EXPR_MUL: case EXPR_DIV:
-            left_unit = check_unit(*expr.expr.binary_expr.left, mem, &err, arena);
-            right_unit = check_unit(*expr.expr.binary_expr.right, mem, &err, arena);
-            left = evaluate(*expr.expr.binary_expr.left, mem, arena);
-            right = evaluate(*expr.expr.binary_expr.right, mem, arena);
+            left_unit = check_unit(*expr.expr.binary_expr.left, mem, err, arena);
+            right_unit = check_unit(*expr.expr.binary_expr.right, mem, err, arena);
+            left = evaluate(*expr.expr.binary_expr.left, mem, err, arena);
+            right = evaluate(*expr.expr.binary_expr.right, mem, err, arena);
             break;
         case EXPR_CONVERT:
             // TODO: Return a unit tree from check_unit so we don't have to run this
             // (and allocate memory) again?
-            left_unit = check_unit(*expr.expr.binary_expr.left, mem, &err, arena);
-            right_unit = check_unit(*expr.expr.binary_expr.right, mem, &err, arena);
-            left = evaluate(*expr.expr.binary_expr.left, mem, arena);
+            left_unit = check_unit(*expr.expr.binary_expr.left, mem, err, arena);
+            right_unit = check_unit(*expr.expr.binary_expr.right, mem, err, arena);
+            left = evaluate(*expr.expr.binary_expr.left, mem, err, arena);
             return left * unit_convert_factor(left_unit, right_unit, arena);
         case EXPR_EMPTY: case EXPR_QUIT: case EXPR_HELP: case EXPR_INVALID:
             assert(false);
@@ -347,6 +347,10 @@ double evaluate(Expression expr, Memory mem, Arena *arena) {
         case EXPR_MUL:
             return left * right;
         case EXPR_DIV:
+            if (right == 0) {
+                *err = err_new(arena, "Cannot divide by zero");
+                return 0;
+            }
             return left / right;
         default:
             assert(false);

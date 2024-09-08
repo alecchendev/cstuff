@@ -438,6 +438,7 @@ void test_check_unit(void *case_idx_opaque) {
 typedef struct {
     const char *input;
     const double expected;
+    const bool err;
 } EvaluateCase;
 
 void test_evaluate_case(void *c_opaque) {
@@ -450,38 +451,46 @@ void test_evaluate_case(void *c_opaque) {
     ErrorString err = err_empty();
     assert(check_valid_expr(expr, &err, &arena));
     assert(!is_unit_unknown(check_unit(expr, mem, &err, &arena)));
-    double result = evaluate(expr, mem, &arena);
-    debug("Expected: %f, got: %f\n", c->expected, result);
-    assert(eq_diff(result, c->expected));
+    double result = evaluate(expr, mem, &err, &arena);
+    if (c->err) {
+        assert(err.len > 0);
+    } else {
+        assert(err.len == 0);
+        debug("Expected: %f, got: %f\n", c->expected, result);
+        assert(eq_diff(result, c->expected));
+    }
     arena_free(&arena);
 }
 
 void test_evaluate(void *case_idx_opaque) {
     const EvaluateCase cases[] = {
         // Basic ops
-        {"42", 42},
-        {"9 + 10", 19},
-        {"20 - 30", -10},
-        {"21 * 2", 42},
-        {"1 / 2", 0.5},
+        {"42", 42, false},
+        {"9 + 10", 19, false},
+        {"20 - 30", -10, false},
+        {"21 * 2", 42, false},
+        {"1 / 2", 0.5, false},
         // Order of operations
-        {"1 + 2 * 3", 7},
-        {"2 / 4 + 1", 1.5},
-        {" 3000  - 600 * 20 / 2.5 +\t20", -1780},
+        {"1 + 2 * 3", 7, false},
+        {"2 / 4 + 1", 1.5, false},
+        {" 3000  - 600 * 20 / 2.5 +\t20", -1780, false},
         // Units
-        {"2 cm * 3 + 1.5cm", 7.5},
-        {"km ^ 2 h lb^-3", 0},
-        {"1 m / s + 2 km / h", 1 + 2.0 * 1000 / 3600},
+        {"2 cm * 3 + 1.5cm", 7.5, false},
+        {"km ^ 2 h lb^-3", 0, false},
+        {"1 m / s + 2 km / h", 1 + 2.0 * 1000 / 3600, false},
         // Conversions
-        {"1 km * 3 -> in", 118110.236100},
-        {"2 s + 3 h - 6 min -> min", (2.0 + 3 * 3600 - 6 * 60) / 60},
-        {"2 s + 3 h^2 / 6 min -> min", (2 + 3.0 / (6.0 / 60) * 3600) / 60},
-        {"6 min / 2 min * 3 s -> s", 6.0 / 2 * (3.0 / 60) * 60},
-        {"6 min * 2 min * 3 s -> s^3", 6.0 * 2 * (3.0 / 60) * 60 * 60 * 60},
+        {"1 km * 3 -> in", 118110.236100, false},
+        {"2 s + 3 h - 6 min -> min", (2.0 + 3 * 3600 - 6 * 60) / 60, false},
+        {"2 s + 3 h^2 / 6 min -> min", (2 + 3.0 / (6.0 / 60) * 3600) / 60, false},
+        {"6 min / 2 min * 3 s -> s", 6.0 / 2 * (3.0 / 60) * 60, false},
+        {"6 min * 2 min * 3 s -> s^3", 6.0 * 2 * (3.0 / 60) * 60 * 60 * 60, false},
         // Compositve conversions
-        {"2 m^2 -> cm^2", 20000},
-        {"2 km s^-1 -> m h^-1", 7200000},
-        {"2 min^2 km -> m h^2", 2.0*1000/60/60},
+        {"2 m^2 -> cm^2", 20000, false},
+        {"2 km s^-1 -> m h^-1", 7200000, false},
+        {"2 min^2 km -> m h^2", 2.0*1000/60/60, false},
+        // Divide by zero
+        {"1 / 0", 0, true},
+        {"2 km / 0 mi", 0, true},
         // TODO: overflow tests
     };
     const size_t num_cases = sizeof(cases) / sizeof(EvaluateCase);
