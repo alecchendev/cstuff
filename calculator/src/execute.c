@@ -48,23 +48,33 @@ bool execute_line(const char *input, char *output, size_t output_len, Memory *me
             memcpy(output, err.msg, err.len);
         } else {
             if (expr_is_number(value.type)) {
-                double result = evaluate(value, *mem, &arena);
-                value = expr_new_const_unit(result, expr_new_unit_full(unit, repl_arena),
-                    repl_arena);
-                snprintf(output, output_len, "%s = %lf %s", var_name, result, display_unit(unit, &arena));
+                double result = evaluate(value, *mem, &err, &arena);
+                if (err.len > 0) {
+                    memcpy(output, err.msg, err.len);
+                } else {
+                    value = expr_new_const_unit(result, expr_new_unit_full(unit, repl_arena),
+                        repl_arena);
+                    snprintf(output, output_len, "%s = %lf %s", var_name, result, display_unit(unit, &arena));
+                }
             } else {
                 value = expr_new_unit_full(unit, repl_arena);
                 snprintf(output, output_len, "%s = %s", var_name, display_unit(unit, &arena));
             }
-            memory_add_var(mem, var_name, value, repl_arena);
+            if (err.len == 0) {
+                memory_add_var(mem, var_name, value, repl_arena);
+            }
         }
     } else {
         Unit unit = check_unit(expr, *mem, &err, &arena);
         if (is_unit_unknown(unit)) {
             memcpy(output, err.msg, err.len);
         } else if (expr_is_number(expr.type)) {
-            double result = evaluate(expr, *mem, &arena);
-            snprintf(output, output_len, "%lf %s", result, display_unit(unit, &arena));
+            double result = evaluate(expr, *mem, &err, &arena);
+            if (err.len > 0) {
+                memcpy(output, err.msg, err.len);
+            } else {
+                snprintf(output, output_len, "%lf %s", result, display_unit(unit, &arena));
+            }
         } else {
             snprintf(output, output_len, "%s", display_unit(unit, &arena));
         }
