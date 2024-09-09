@@ -113,8 +113,8 @@ bool check_valid_expr(Expression expr, ErrorString *err, Arena *arena) {
           display_expr_op(expr.type), display_expr_op(left_type), display_expr_op(right_type));
     switch (expr.type) {
         case EXPR_CONST_UNIT:
-            if ((left_type == EXPR_CONSTANT || left_type == EXPR_NEG) &&
-                (expr_is_unit(right_type))) {
+            if ((left_type == EXPR_CONSTANT || left_type == EXPR_CONST_UNIT ||
+                left_type == EXPR_NEG) && (expr_is_unit(right_type))) {
                 return true;
             }
             *err = err_new(arena, invalid_const_unit_msg,
@@ -278,7 +278,7 @@ Unit check_unit(Expression expr, Memory mem, ErrorString *err, Arena *arena) {
     } else if (expr.type == EXPR_MUL) {
         debug("combining units for mul\n");
         unit = unit_combine(left, right, false, arena);
-    } else if (expr.type == EXPR_COMP_UNIT) {
+    } else if (expr.type == EXPR_COMP_UNIT || expr.type == EXPR_CONST_UNIT) {
         debug("combining units for comp\n");
         unit = unit_combine(left, right, true, arena);
         if (is_unit_unknown(unit)) {
