@@ -586,6 +586,8 @@ void test_memory(void *case_idx_opaque) {
     const char *case10_in[] = {"x = 3 s", "y = km", "x y"};
     const char *case11_in[] = {"x = km", "1 kg x s"};
     const char *case12_in[] = {"x = s", "1 s kg"};
+    const char *case13_in[] = {"x = 3", "kg ^ x"};
+    const char *case14_in[] = {"x = 3 m", "kg ^ x"};
     const MemoryCase cases[] = {
         {case1_in, 2, 7, unit_new_none(&arena)},
         {case2_in, 2, 8, unit_new_none(&arena)},
@@ -599,6 +601,8 @@ void test_memory(void *case_idx_opaque) {
         {case10_in, 3, 3, unit_new((UnitType[]){UNIT_SECOND, UNIT_KILOMETER}, (int[]){1, 1}, 2, &arena)},
         {case11_in, 2, 1, unit_new((UnitType[]){UNIT_KILOGRAM, UNIT_KILOMETER, UNIT_SECOND}, (int[]){1, 1, 1}, 3, &arena)},
         {case12_in, 2, 1, unit_new((UnitType[]){UNIT_SECOND, UNIT_KILOGRAM}, (int[]){1, 1}, 2, &arena)},
+        {case13_in, 2, 0, unit_new_single(UNIT_KILOGRAM, 3, &arena)},
+        {case14_in, 2, 0, unit_new_unknown(&arena)},
     };
     const size_t num_cases = sizeof(cases) / sizeof(MemoryCase);
     bool all_passed = true;

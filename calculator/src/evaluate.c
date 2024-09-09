@@ -157,7 +157,8 @@ bool check_valid_expr(Expression expr, ErrorString *err, Arena *arena) {
                 display_expr_op(left_type), display_expr_op(right_type));
             return false;
         case EXPR_POW:
-            if (expr_is_unit(left_type) && (right_type == EXPR_CONSTANT || right_type == EXPR_NEG)) {
+            if (expr_is_unit(left_type) && (right_type == EXPR_CONSTANT
+                || right_type == EXPR_NEG || right_type == EXPR_CONST_UNIT)) {
                 return true;
             }
             *err = err_new(arena, invalid_pow_msg,
