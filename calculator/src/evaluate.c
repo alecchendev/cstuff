@@ -254,14 +254,17 @@ Unit check_unit(Expression expr, Memory mem, ErrorString *err, Arena *arena) {
         debug("unit unknown\n");
         unit = unit_new_unknown(arena);
     } else if (expr.type == EXPR_POW) {
-        if (is_unit_none(left) || left.length != 1 || !is_unit_none(right)) {
+        if (is_unit_none(left) || !is_unit_none(right)) {
             *err = err_new(arena, "Expected single degree unit ^ constant: %s ^ %s",
                 display_unit(left, arena), display_unit(right, arena));
             return unit_new_unknown(arena);
         }
         debug("pow: %s ^ %lf\n", display_unit(left, arena), expr.expr.binary_expr.right->expr.constant);
         Unit left_dup = unit_new(left.types, left.degrees, left.length, arena);
-        left_dup.degrees[0] *= evaluate(*expr.expr.binary_expr.right, mem, err, arena);
+        double degree = evaluate(*expr.expr.binary_expr.right, mem, err, arena);
+        for (size_t i = 0; i < left_dup.length; i++) {
+            left_dup.degrees[i] *= degree;
+        }
         unit = left_dup;
     } else if (expr.type == EXPR_CONVERT) {
         if (!unit_convert_valid(left, right, err, arena)) {
