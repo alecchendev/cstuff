@@ -31,6 +31,14 @@ struct HashMap {
     bool *exists;
 };
 
+void display_keys(HashMap map) {
+    for (size_t i = 0; i < map.capacity; i++) {
+        if (map.exists[i]) {
+            debug("Key: %s\n", map.items[i].key);
+        }
+    }
+}
+
 bool is_pow_two(size_t num) {
     if (num == 0) return true;
     size_t bit_count = 0;
@@ -59,11 +67,17 @@ HashMap hash_map_new(size_t value_size, Arena *arena) {
 }
 
 void hash_map_insert_alloc(HashMap *map, const unsigned char *key, void *value, bool alloc, Arena *arena) {
-    size_t idx = djb2_hash(key, map->capacity);
-    while (map->exists[idx] && strcmp((char *)map->items[idx].key, (char *)key) != 0) {
-        idx = (idx + 1) & (map->capacity - 1);
-    }
-    map->items[idx] = (KeyValue) { .key = key, .value = value };
+    size_t init_idx = djb2_hash(key, map->capacity);
+    size_t idx = init_idx;
+    do {
+        if (map->exists[idx] && strcmp((char *)map->items[idx].key, (char *)key) != 0) {
+            idx = (idx + 1) & (map->capacity - 1);
+        }
+    } while (idx != init_idx);
+    size_t key_len = strlen((char *)key) + 1;
+    unsigned char *key_alloc = arena_alloc(arena, key_len);
+    memcpy(key_alloc, key, key_len);
+    map->items[idx] = (KeyValue) { .key = key_alloc, .value = value };
     if (alloc) {
         map->items[idx].value = arena_alloc(arena, map->value_size);
         memcpy(map->items[idx].value, value, map->value_size);
@@ -92,23 +106,23 @@ void hash_map_insert(HashMap *map, const unsigned char *key, void *value, Arena 
     hash_map_insert_alloc(map, key, value, true, arena);
 }
 
-bool hash_map_contains(HashMap *map, const unsigned char *key) {
-    size_t init_idx = djb2_hash(key, map->capacity);
+bool hash_map_contains(HashMap map, const unsigned char *key) {
+    size_t init_idx = djb2_hash(key, map.capacity);
     size_t idx = init_idx;
     do {
-        if (map->exists[idx] && strcmp((char *)map->items[idx].key, (char *)key) == 0) {
+        if (map.exists[idx] && strcmp((char *)map.items[idx].key, (char *)key) == 0) {
             return true;
         }
     } while (idx != init_idx);
     return false;
 }
 
-void *hash_map_get(HashMap *map, const unsigned char *key) {
-    size_t init_idx = djb2_hash(key, map->capacity);
+void *hash_map_get(HashMap map, const unsigned char *key) {
+    size_t init_idx = djb2_hash(key, map.capacity);
     size_t idx = init_idx;
     do {
-        if (map->exists[idx] && strcmp((char *)map->items[idx].key, (char *)key) == 0) {
-            return map->items[idx].value;
+        if (map.exists[idx] && strcmp((char *)map.items[idx].key, (char *)key) == 0) {
+            return map.items[idx].value;
         }
     } while (idx != init_idx);
     return NULL;

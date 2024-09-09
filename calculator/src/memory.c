@@ -1,7 +1,8 @@
 #pragma once
 
-#include "hash_map.c"
+#include "debug.c"
 #include "expression.c"
+#include "hash_map.c"
 
 // Structures for tracking user defined things
 // we want to track between different executions.
@@ -20,12 +21,19 @@ void memory_add_var(Memory *mem, unsigned char *var_name, Expression value, Aren
 }
 
 bool memory_contains_var(Memory mem, unsigned char *var_name) {
-    // TODO: debug display map and what var we're requesting
-    return hash_map_contains(&mem.vars, (unsigned char *)var_name);
+    debug("Checking for var: %s\n", var_name);
+    for (size_t i = 0; i < mem.vars.capacity; i++) {
+        if (mem.vars.exists[i]) {
+            debug("Key: %s\n", mem.vars.items[i].key);
+        }
+    }
+    bool result = hash_map_contains(mem.vars, (unsigned char *)var_name);
+    debug("found: %d\n", result);
+    return result;
 }
 
-Expression memory_get_var(Memory mem, unsigned char *var_name) {
-    assert(hash_map_contains(&mem.vars, (unsigned char *)var_name));
-    return *(Expression *)hash_map_get(&mem.vars, (unsigned char *)var_name);
+const Expression memory_get_var(Memory mem, unsigned char *var_name) {
+    assert(hash_map_contains(mem.vars, (unsigned char *)var_name));
+    return *(Expression *)hash_map_get(mem.vars, (unsigned char *)var_name);
 }
 
