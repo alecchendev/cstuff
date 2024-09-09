@@ -66,3 +66,10 @@ void arena_free(Arena *arena) {
     }
 }
 
+void arena_clear(Arena *arena) {
+    ArenaBlock *next;
+    for (ArenaBlock *block = arena->first; block != NULL; block = next) {
+        next = block->next;
+        block->size = 0;
+    }
+}

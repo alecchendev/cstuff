@@ -47,14 +47,20 @@ ErrorString err_new(Arena *arena, const char *fmt, ...) {
 
 void substitute_variables(Expression *expr, Memory mem) {
     if (expr->type == EXPR_VAR && memory_contains_var(mem, expr->expr.var_name)) {
+        debug("Substituting variable: %s\n", expr->expr.var_name);
         *expr = memory_get_var(mem, expr->expr.var_name);
     } else if (expr->type == EXPR_SET_VAR) {
+        debug("Substituting variables for set var expr\n");
         substitute_variables(expr->expr.binary_expr.right, mem);
     } else if (expr->type == EXPR_NEG) {
+        debug("Substituting variables for negation expr\n");
         substitute_variables(expr->expr.unary_expr.right, mem);
     } else if (expr_is_bin(expr->type)) {
+        debug("Substituting variables for binary expr: %s\n", display_expr_op(expr->type));
         substitute_variables(expr->expr.binary_expr.left, mem);
         substitute_variables(expr->expr.binary_expr.right, mem);
+    } else {
+        debug("No substitution for type: %s\n", display_expr_op(expr->type));
     }
 }
 

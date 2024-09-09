@@ -9,6 +9,7 @@
 #include "parse.c"
 #include "tokenize.c"
 #include "debug.c"
+#include "unit.c"
 
 // Only global variable in this file. So
 // we don't have to pipe an extra bool through
@@ -354,6 +355,10 @@ void test_invalid_expr(void *case_idx_opaque) {
         {"asdf asdf"},
         {"asdf asdf asdf"},
         {"asdf asdf asdf asdf"},
+        // Variables variables
+        {"km = 3"},
+        // {"quit = 3"},
+        {"x + 1 = 2"},
     };
     const size_t num_cases = sizeof(cases) / sizeof(InvalidExprCase);
     bool all_passed = true;
@@ -517,6 +522,94 @@ void test_unit_mirror(void *_) {
             }
         }
     }
+}
+
+// Sequence of inputs, expected result of final output
+typedef struct {
+    const char **input;
+    const size_t n_inputs;
+    const double expected_result;
+    const Unit expected_unit;
+} MemoryCase;
+
+// TODO: make `execute_line` more testable, and simplify this
+void test_memory_case(void *c_opaque) {
+    MemoryCase *c = (MemoryCase *)c_opaque;
+    Arena mem_arena = arena_create();
+    Memory mem = memory_new(&mem_arena);
+    Arena line_arena = arena_create();
+    double result;
+    Unit unit;
+    for (size_t i = 0; i < c->n_inputs; i++) {
+        TokenString tokens = tokenize(c->input[i], &line_arena);
+        Expression expr = parse(tokens, mem, &line_arena);
+        substitute_variables(&expr, mem);
+        display_expr(0, expr, &line_arena);
+        ErrorString err = err_empty();
+        assert(check_valid_expr(expr, &err, &line_arena));
+        if (expr.type == EXPR_SET_VAR) {
+            unsigned char * var_name = expr.expr.binary_expr.left->expr.var_name;
+            Expression value = *expr.expr.binary_expr.right;
+            unit = check_unit(value, mem, &err, &line_arena);
+            if (expr_is_number(value.type)) {
+                double result = evaluate(value, mem, &err, &line_arena);
+                debug("err: %s\n", err.msg);
+                assert(err.len == 0);
+                value = expr_new_const_unit(result, expr_new_unit_full(unit, &mem_arena),
+                    &mem_arena);
+            } else {
+                value = expr_new_unit_full(unit, &mem_arena);
+            }
+            memory_add_var(&mem, var_name, value, &mem_arena);
+        } else {
+            unit = check_unit(expr, mem, &err, &line_arena);
+            result = evaluate(expr, mem, &err, &line_arena);
+        }
+        if (i < c->n_inputs - 1) arena_clear(&line_arena);
+    }
+    assert(units_equal(unit, c->expected_unit, &line_arena));
+    debug("Expected: %f, got: %f\n", c->expected_result, result);
+    assert(eq_diff(result, c->expected_result));
+}
+
+void test_memory(void *case_idx_opaque) {
+    Arena arena = arena_create();
+    const char *case1_in[] = {"x = 7", "x"};
+    const char *case2_in[] = {"x = 8", "x"};
+    const char *case3_in[] = {"x = km", "s / x"};
+    const char *case4_in[] = {"x = 3", "x + 1"};
+    const char *case5_in[] = {"x = 3", "x + x * x - x / -x"};
+    const char *case6_in[] = {"x = 2 km", "x + 500 m"};
+    const char *case7_in[] = {"x = 2000 m + 50000 cm -> km", "x"};
+    const char *case8_in[] = {"x = km", "x"};
+    const char *case9_in[] = {"x = 3", "y = km", "x y"};
+    const char *case10_in[] = {"x = 3 s", "y = km", "x y"};
+    const char *case11_in[] = {"x = km", "1 kg x s"};
+    const char *case12_in[] = {"x = s", "1 s kg"};
+    const MemoryCase cases[] = {
+        {case1_in, 2, 7, unit_new_none(&arena)},
+        {case2_in, 2, 8, unit_new_none(&arena)},
+        {case3_in, 2, 0, unit_new((UnitType[]){UNIT_SECOND, UNIT_KILOMETER}, (int[]){1, -1}, 2, &arena)},
+        {case4_in, 2, 4, unit_new_none(&arena)},
+        {case5_in, 2, 13, unit_new_none(&arena)},
+        {case6_in, 2, 2.5, unit_new_single(UNIT_KILOMETER, 1, &arena)},
+        {case7_in, 2, 2.5, unit_new_single(UNIT_KILOMETER, 1, &arena)},
+        {case8_in, 2, 0, unit_new_single(UNIT_KILOMETER, 1, &arena)},
+        {case9_in, 3, 3, unit_new_single(UNIT_KILOMETER, 1, &arena)},
+        {case10_in, 3, 3, unit_new((UnitType[]){UNIT_SECOND, UNIT_KILOMETER}, (int[]){1, 1}, 2, &arena)},
+        {case11_in, 2, 1, unit_new((UnitType[]){UNIT_KILOGRAM, UNIT_KILOMETER, UNIT_SECOND}, (int[]){1, 1, 1}, 3, &arena)},
+        {case12_in, 2, 1, unit_new((UnitType[]){UNIT_SECOND, UNIT_KILOGRAM}, (int[]){1, 1}, 2, &arena)},
+    };
+    const size_t num_cases = sizeof(cases) / sizeof(MemoryCase);
+    bool all_passed = true;
+    ssize_t case_idx = *(ssize_t *)case_idx_opaque;
+    CaseBound bound = case_bound(case_idx, num_cases);
+    for (size_t i = bound.start; i < bound.end; i++) {
+        all_passed &= run_test_case(i, test_memory_case, (void *)&cases[i],
+                                     NULL, "Case %zu failed\n");
+    }
+    assert(all_passed);
+    arena_free(&arena);
 }
 
 typedef struct {
@@ -688,6 +781,7 @@ int main(int argc, char **argv) {
         test_invalid_expr,
         test_check_unit,
         test_evaluate,
+        test_memory,
         test_unit_mirror,
         test_display_unit,
         test_is_pow_two,
