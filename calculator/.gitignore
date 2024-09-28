@@ -1,1 +1,3 @@
 build
+website/lib.js
+website/lib.wasm
