@@ -532,6 +532,9 @@ typedef struct {
     const Unit expected_unit;
 } MemoryCase;
 
+// TODO: make function to create memory case, then you can
+// define the inputs inline
+
 // TODO: make `execute_line` more testable, and simplify this
 void test_memory_case(void *c_opaque) {
     MemoryCase *c = (MemoryCase *)c_opaque;
@@ -762,6 +765,9 @@ void test_hash_map(void *case_idx_opaque) {
     }
     assert(all_passed);
 }
+
+// TODO: history bug: if you do a command, then press up and execute,
+// then press up again, it's blank.
 
 int main(int argc, char **argv) {
     ssize_t single_test_idx = -1;
