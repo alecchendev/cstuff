@@ -19,9 +19,20 @@
             font-size: 2rem;
         }
         h1 {
-            margin-top: 2rem;
-            font-size: 2.5rem;
+            font-size: 2rem;
             font-weight: normal;
+        }
+        h2 {
+            font-size: 2rem;
+            font-weight: normal;
+        }
+        a {
+            color: #d1d0c5;
+            text-decoration: none;
+        }
+        a:hover {
+            color: #e2b714;
+            text-decoration: underline;
         }
         :root {
             font-family: 'Roboto Mono', monospace;
@@ -59,10 +70,31 @@
         .output {
             color: #e2b714;
         }
+
+        .topBar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #d1d0c5;
+            margin-top: 2rem;
+        }
+        .topRight {
+            display: flex;
+            gap: 2rem;
+        }
     </style>
 </head>
 <body>
-    <h1>Physics calculator</h1>
+    <div class="topBar">
+        <div class="topLeft">
+            <a href="/"><h1>Physics calculator</h1></a>
+        </div>
+        <div class="topRight">
+            <a href="https://github.com/alecchendev/cstuff/tree/main/calculator"><h2>Code</a></h2>
+            <a href="/docs.html"><h2>Docs</h2></a>
+            <a href="/https://docs.google.com/forms/d/e/1FAIpQLSfXhPMlBT8OK4WFXS6YCNfE1e5KtFZG-20DyEkQmAdoAGc7ig/viewform?usp=sf_link"><h2>Feedback</h2></a>
+        </div>
+    </div>
     
     <!-- History Display -->
     <div id="history"></div>
@@ -75,6 +107,7 @@
         let history = [];
 
         function processInput() {
+
             const inputElement = document.getElementById('inputBox');
             const historyElement = document.getElementById('history');
 
