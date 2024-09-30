@@ -151,7 +151,11 @@ Unit unit_new_unknown(Arena *arena) {
 char *display_unit(Unit unit, Arena *arena) {
     assert(unit.length > 0);
     if (is_unit_none(unit)) {
+#ifdef DEBUG
         return "none";
+#else
+        return "";
+#endif
     }
     if (is_unit_unknown(unit)) {
         return "unknown";
