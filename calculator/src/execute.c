@@ -54,7 +54,7 @@ bool execute_line(const char *input, char *output, size_t output_len, Memory *me
                 } else {
                     value = expr_new_const_unit(result, expr_new_unit_full(unit, repl_arena),
                         repl_arena);
-                    snprintf(output, output_len, "%s = %lf %s", var_name, result, display_unit(unit, &arena));
+                    snprintf(output, output_len, "%s = %g %s", var_name, result, display_unit(unit, &arena));
                 }
             } else {
                 value = expr_new_unit_full(unit, repl_arena);
@@ -73,7 +73,7 @@ bool execute_line(const char *input, char *output, size_t output_len, Memory *me
             if (err.len > 0) {
                 memcpy(output, err.msg, err.len);
             } else {
-                snprintf(output, output_len, "%lf %s", result, display_unit(unit, &arena));
+                snprintf(output, output_len, "%g %s", result, display_unit(unit, &arena));
             }
         } else {
             snprintf(output, output_len, "%s", display_unit(unit, &arena));
